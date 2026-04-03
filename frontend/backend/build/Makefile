@@ -681,6 +681,30 @@ core/commands/rmusr.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/extreamfs.dir/build.make CMakeFiles/extreamfs.dir/core/commands/rmusr.cpp.s
 .PHONY : core/commands/rmusr.cpp.s
 
+core/commands/unmount_cmd.o: core/commands/unmount_cmd.cpp.o
+.PHONY : core/commands/unmount_cmd.o
+
+# target to build an object file
+core/commands/unmount_cmd.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/extreamfs.dir/build.make CMakeFiles/extreamfs.dir/core/commands/unmount_cmd.cpp.o
+.PHONY : core/commands/unmount_cmd.cpp.o
+
+core/commands/unmount_cmd.i: core/commands/unmount_cmd.cpp.i
+.PHONY : core/commands/unmount_cmd.i
+
+# target to preprocess a source file
+core/commands/unmount_cmd.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/extreamfs.dir/build.make CMakeFiles/extreamfs.dir/core/commands/unmount_cmd.cpp.i
+.PHONY : core/commands/unmount_cmd.cpp.i
+
+core/commands/unmount_cmd.s: core/commands/unmount_cmd.cpp.s
+.PHONY : core/commands/unmount_cmd.s
+
+# target to generate assembly for a file
+core/commands/unmount_cmd.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/extreamfs.dir/build.make CMakeFiles/extreamfs.dir/core/commands/unmount_cmd.cpp.s
+.PHONY : core/commands/unmount_cmd.cpp.s
+
 core/disk/disk_creator.o: core/disk/disk_creator.cpp.o
 .PHONY : core/disk/disk_creator.o
 
@@ -1215,6 +1239,9 @@ help:
 	@echo "... core/commands/rmusr.o"
 	@echo "... core/commands/rmusr.i"
 	@echo "... core/commands/rmusr.s"
+	@echo "... core/commands/unmount_cmd.o"
+	@echo "... core/commands/unmount_cmd.i"
+	@echo "... core/commands/unmount_cmd.s"
 	@echo "... core/disk/disk_creator.o"
 	@echo "... core/disk/disk_creator.i"
 	@echo "... core/disk/disk_creator.s"

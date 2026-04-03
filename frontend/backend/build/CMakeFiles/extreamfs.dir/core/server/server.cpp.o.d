@@ -364,4 +364,9 @@ CMakeFiles/extreamfs.dir/core/server/server.cpp.o: \
  /home/mariano/MIA_1S2026_P1_202101149/frontend/backend/core/server/../commands/chown_cmd.h \
  /home/mariano/MIA_1S2026_P1_202101149/frontend/backend/core/server/../commands/chmod_cmd.h \
  /home/mariano/MIA_1S2026_P1_202101149/frontend/backend/core/server/../commands/journaling_cmd.h \
- /home/mariano/MIA_1S2026_P1_202101149/frontend/backend/core/server/../commands/loss_cmd.h
+ /home/mariano/MIA_1S2026_P1_202101149/frontend/backend/core/server/../commands/loss_cmd.h \
+ /home/mariano/MIA_1S2026_P1_202101149/frontend/backend/core/server/../commands/unmount_cmd.h \
+ /home/mariano/MIA_1S2026_P1_202101149/frontend/backend/core/server/../filesystem/EXT2Utils.h \
+ /home/mariano/MIA_1S2026_P1_202101149/frontend/backend/include/../core/filesystem/SuperBlock.h \
+ /home/mariano/MIA_1S2026_P1_202101149/frontend/backend/include/../core/filesystem/Inode.h \
+ /home/mariano/MIA_1S2026_P1_202101149/frontend/backend/include/../core/filesystem/Blocks.h
