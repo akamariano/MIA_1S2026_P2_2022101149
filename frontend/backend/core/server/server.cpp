@@ -40,6 +40,10 @@ using namespace httplib;
 #include "../commands/chmod_cmd.h"
 #include "../commands/journaling_cmd.h"
 #include "../commands/loss_cmd.h"
+#include "../filesystem/EXT2Utils.h"
+#include "../core/filesystem/SuperBlock.h"
+#include "../core/filesystem/Inode.h"
+#include "../core/filesystem/Blocks.h"
 #include <algorithm>
 
 string captureOutput(function<void()> fn) {
@@ -143,21 +147,39 @@ string processCommand(const string& rawInput) {
         }
 
         // ================== FDISK ==================
-        else if (command == "fdisk") {
-            int size = -1; char unit = 'B', type = 'P';
+                else if (command == "fdisk") {
+            int size = -1; char unit = 'K'; char type = 'P';
             string fit = "WF", path = "", name = "";
+            string deleteType = "", addStr = "";
+            bool hasAdd = false;
+            int addVal = 0;
+ 
             for (int i = 1; i < (int)args.size(); i++) {
                 string p = args[i], lower = p;
                 transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-                if      (lower.find("-size=") == 0) size = stoi(p.substr(6));
-                else if (lower.find("-unit=") == 0) unit = toupper(p.substr(6)[0]);
-                else if (lower.find("-path=") == 0) path = stripQuotes(p.substr(6));
-                else if (lower.find("-type=") == 0) type = toupper(p.substr(6)[0]);
-                else if (lower.find("-fit=")  == 0) { fit = p.substr(5); transform(fit.begin(), fit.end(), fit.begin(), ::toupper); }
-                else if (lower.find("-name=") == 0) name = stripQuotes(p.substr(6));
+                if      (lower.find("-size=")   == 0) size = stoi(p.substr(6));
+                else if (lower.find("-unit=")   == 0) unit = toupper(p.substr(6)[0]);
+                else if (lower.find("-path=")   == 0) path = stripQuotes(p.substr(6));
+                else if (lower.find("-type=")   == 0) type = toupper(p.substr(6)[0]);
+                else if (lower.find("-fit=")    == 0) { fit = p.substr(5); transform(fit.begin(), fit.end(), fit.begin(), ::toupper); }
+                else if (lower.find("-name=")   == 0) name = stripQuotes(p.substr(6));
+                else if (lower.find("-delete=") == 0) deleteType = lower.substr(8);
+                else if (lower.find("-add=")    == 0) { addVal = stoi(p.substr(5)); hasAdd = true; }
             }
-            if (size <= 0 || path.empty() || name.empty()) { cout << "ERROR: Parámetros inválidos\n"; return; }
-            FDisk fd; fd.execute(size, unit, path, type, fit, name);
+ 
+            if (!deleteType.empty()) {
+                // FDISK DELETE
+                FDisk fd; fd.executeDelete(deleteType, name, path);
+            } else if (hasAdd) {
+                // FDISK ADD
+                FDisk fd; fd.executeAdd(addVal, unit, name, path);
+            } else {
+                // FDISK CREATE (original)
+                if (size <= 0 || path.empty() || name.empty()) {
+                    cout << "ERROR: Parámetros inválidos\n"; return;
+                }
+                FDisk fd; fd.execute(size, unit, path, type, fit, name);
+            }
         }
 
         // ================== MOUNT / MOUNTED ==================
@@ -598,7 +620,286 @@ void startServer(int port) {
         string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
         res.set_content(content, contentType.c_str());
     });
+    // ===== GET /disks =====
+    svr.Get("/disks", [](const Request&, Response& res) {
+        ostringstream json;
+        json << "[";
+        bool first = true;
+        for (auto& m : MountManager::getAll()) {
+            if (!first) json << ",";
+            json << "{"
+                 << "\"id\":\"" << m.id << "\","
+                 << "\"path\":\"" << m.path << "\","
+                 << "\"name\":\"" << m.name << "\","
+                 << "\"start\":" << m.start << ","
+                 << "\"size\":" << m.size
+                 << "}";
+            first = false;
+        }
+        json << "]";
+        res.set_content(json.str(), "application/json");
+    });
 
+    // ===== GET /browse?id=491A&path=/ =====
+    svr.Get("/browse", [](const Request& req, Response& res) {
+        if (!req.has_param("id") || !req.has_param("path")) {
+            res.status = 400;
+            res.set_content("{\"error\":\"id y path requeridos\"}", "application/json");
+            return;
+        }
+        string id   = req.get_param_value("id");
+        string path = req.get_param_value("path");
+
+        MountedPartition* part = MountManager::getMountedById(id);
+        if (!part) {
+            res.status = 404;
+            res.set_content("{\"error\":\"ID no montado\"}", "application/json");
+            return;
+        }
+
+        FILE* disk = fopen(part->path.c_str(), "rb");
+        if (!disk) {
+            res.status = 500;
+            res.set_content("{\"error\":\"No se pudo abrir disco\"}", "application/json");
+            return;
+        }
+
+        SuperBlock sb;
+        readSuperBlock(disk, part->start, sb);
+
+        // Validar magic number — rechaza particiones sin formato
+        if (sb.s_magic != 0xEF53) {
+            fclose(disk);
+            res.status = 400;
+            res.set_content("{\"error\":\"Particion sin formato EXT2/EXT3\"}", "application/json");
+            return;
+        }
+
+        int inodeNum = resolvePath(disk, sb, path);
+        if (inodeNum == -1) {
+            fclose(disk);
+            res.status = 404;
+            res.set_content("{\"error\":\"Ruta no encontrada\"}", "application/json");
+            return;
+        }
+
+        // Validar que el inodo del directorio está activo en el bitmap
+        if (readBitmapInode(disk, sb, inodeNum) != 1) {
+            fclose(disk);
+            res.status = 404;
+            res.set_content("{\"error\":\"Directorio no disponible\"}", "application/json");
+            return;
+        }
+
+        Inode dirInode;
+        readInode(disk, sb, inodeNum, dirInode);
+
+        if (dirInode.i_type != '0') {
+            fclose(disk);
+            res.status = 400;
+            res.set_content("{\"error\":\"La ruta no es un directorio\"}", "application/json");
+            return;
+        }
+
+        ostringstream json;
+        json << "{\"path\":\"" << path << "\",\"entries\":[";
+        bool first = true;
+
+        for (int b = 0; b < 12; b++) {
+            if (dirInode.i_block[b] == -1) break;
+
+            // Validar que el bloque está activo
+            if (readBitmapBlock(disk, sb, dirInode.i_block[b]) != 1) continue;
+
+            DirectoryBlock db;
+            memset(&db, 0, sizeof(DirectoryBlock));
+            readBlock(disk, sb, dirInode.i_block[b], &db);
+
+            for (int e = 0; e < 4; e++) {
+                if (db.b_content[e].b_inodo == -1) continue;
+
+                string ename(db.b_content[e].b_name,
+                             strnlen(db.b_content[e].b_name, 12));
+
+                // Saltar entradas especiales y nombres vacíos
+                if (ename.empty() || ename == "." || ename == "..") continue;
+
+                int childInodeNum = db.b_content[e].b_inodo;
+
+                // Validar rango del inodo
+                if (childInodeNum < 0 || childInodeNum >= sb.s_inodes_count) continue;
+
+                // Validar que el inodo hijo está activo en el bitmap
+                if (readBitmapInode(disk, sb, childInodeNum) != 1) continue;
+
+                Inode child;
+                readInode(disk, sb, childInodeNum, child);
+
+                // Validar tipo válido
+                if (child.i_type != '0' && child.i_type != '1') continue;
+
+                // Formatear permisos UGO
+                string typePrefix = (child.i_type == '0') ? "d" : "-";
+                int p = child.i_perm;
+                int u = (p / 100) % 10, g = (p / 10) % 10, o = p % 10;
+                auto bits = [](int x) -> string {
+                    string r;
+                    r += (x & 4) ? "r" : "-";
+                    r += (x & 2) ? "w" : "-";
+                    r += (x & 1) ? "x" : "-";
+                    return r;
+                };
+                string perms = typePrefix + bits(u) + bits(g) + bits(o);
+
+                // Formatear fecha — validar timestamp razonable (> año 2000)
+                char dateBuf[32] = "fecha invalida";
+                if (child.i_ctime > 946684800) {
+                    struct tm* ti = localtime(&child.i_ctime);
+                    if (ti) strftime(dateBuf, sizeof(dateBuf), "%d/%m/%Y %H:%M", ti);
+                }
+
+                // Escapar nombre para JSON
+                string safeName;
+                for (char c : ename) {
+                    if      (c == '"')  safeName += "\\\"";
+                    else if (c == '\\') safeName += "\\\\";
+                    else safeName += c;
+                }
+
+                if (!first) json << ",";
+                json << "{"
+                     << "\"name\":\""  << safeName << "\","
+                     << "\"type\":\""  << (child.i_type == '0' ? "folder" : "file") << "\","
+                     << "\"size\":"    << child.i_size << ","
+                     << "\"perm\":\""  << perms << "\","
+                     << "\"uid\":"     << child.i_uid << ","
+                     << "\"gid\":"     << child.i_gid << ","
+                     << "\"date\":\""  << dateBuf << "\""
+                     << "}";
+                first = false;
+            }
+        }
+
+        json << "]}";
+        fclose(disk);
+        res.set_content(json.str(), "application/json");
+    });
+
+    // ===== GET /file?id=491A&path=/home/a.txt =====
+    svr.Get("/file", [](const Request& req, Response& res) {
+        if (!req.has_param("id") || !req.has_param("path")) {
+            res.status = 400;
+            res.set_content("{\"error\":\"id y path requeridos\"}", "application/json");
+            return;
+        }
+        string id   = req.get_param_value("id");
+        string path = req.get_param_value("path");
+
+        MountedPartition* part = MountManager::getMountedById(id);
+        if (!part) {
+            res.status = 404;
+            res.set_content("{\"error\":\"ID no montado\"}", "application/json");
+            return;
+        }
+
+        FILE* disk = fopen(part->path.c_str(), "rb");
+        if (!disk) {
+            res.status = 500;
+            res.set_content("{\"error\":\"No se pudo abrir disco\"}", "application/json");
+            return;
+        }
+
+        SuperBlock sb;
+        readSuperBlock(disk, part->start, sb);
+
+        int inodeNum = resolvePath(disk, sb, path);
+        if (inodeNum == -1) {
+            fclose(disk);
+            res.status = 404;
+            res.set_content("{\"error\":\"Archivo no encontrado\"}", "application/json");
+            return;
+        }
+
+        // Validar bitmap
+        if (readBitmapInode(disk, sb, inodeNum) != 1) {
+            fclose(disk);
+            res.status = 404;
+            res.set_content("{\"error\":\"Archivo no disponible\"}", "application/json");
+            return;
+        }
+
+        Inode inode;
+        readInode(disk, sb, inodeNum, inode);
+
+        if (inode.i_type != '1') {
+            fclose(disk);
+            res.status = 400;
+            res.set_content("{\"error\":\"No es un archivo\"}", "application/json");
+            return;
+        }
+
+        string content;
+        for (int b = 0; b < 12; b++) {
+            if (inode.i_block[b] == -1) break;
+            FileBlock fb;
+            memset(&fb, 0, sizeof(FileBlock));
+            readBlock(disk, sb, inode.i_block[b], &fb);
+            int toRead = min((int)sizeof(fb.b_content),
+                             inode.i_size - (int)content.size());
+            if (toRead <= 0) break;
+            content.append(fb.b_content, toRead);
+        }
+        // Bloque indirecto
+        if (inode.i_block[12] != -1) {
+            PointerBlock pb;
+            readBlock(disk, sb, inode.i_block[12], &pb);
+            for (int i = 0; i < 16; i++) {
+                if (pb.b_pointers[i] == -1) break;
+                FileBlock fb;
+                memset(&fb, 0, sizeof(FileBlock));
+                readBlock(disk, sb, pb.b_pointers[i], &fb);
+                int toRead = min((int)sizeof(fb.b_content),
+                                 inode.i_size - (int)content.size());
+                if (toRead <= 0) break;
+                content.append(fb.b_content, toRead);
+            }
+        }
+        fclose(disk);
+
+        // Escapar para JSON
+        string escaped;
+        for (char c : content) {
+            if      (c == '"')  escaped += "\\\"";
+            else if (c == '\\') escaped += "\\\\";
+            else if (c == '\n') escaped += "\\n";
+            else if (c == '\r') escaped += "\\r";
+            else escaped += c;
+        }
+
+        res.set_content("{\"path\":\"" + path + "\",\"content\":\"" + escaped + "\"}",
+                        "application/json");
+    });
+
+    // ===== GET /journaling?id=491B =====
+    svr.Get("/journaling", [](const Request& req, Response& res) {
+        if (!req.has_param("id")) {
+            res.status = 400;
+            res.set_content("{\"error\":\"id requerido\"}", "application/json");
+            return;
+        }
+        string id = req.get_param_value("id");
+        string output = processCommand("journaling -id=" + id);
+
+        string escaped;
+        for (char c : output) {
+            if      (c == '"')  escaped += "\\\"";
+            else if (c == '\\') escaped += "\\\\";
+            else if (c == '\n') escaped += "\\n";
+            else if (c == '\r') escaped += "\\r";
+            else escaped += c;
+        }
+        res.set_content("{\"output\":\"" + escaped + "\"}", "application/json");
+    });
     cout << "==============================\n";
     cout << " EXTREAMFS SERVER\n";
     cout << " Puerto: " << port << "\n";

@@ -410,3 +410,10 @@ int EXT2Writer::createDirPublic(FILE* disk, SuperBlock& sb,
                                  int uid, int gid) {
     return createDirectory(disk, sb, partStart, parentInode, name, uid, gid);
 }
+bool EXT2Writer::writeFileContentPublic(FILE* disk, SuperBlock& sb,
+                                         long long partStart,
+                                         Inode& fileInode, int inodeNum,
+                                         const std::string& content) {
+    return writeFileContent(disk, sb, partStart, fileInode, inodeNum, content);
+}
+ 

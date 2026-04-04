@@ -1,0 +1,393 @@
+#!/bin/bash
+# Calificacion Proyecto 2 — ExtreamFS
+# 1S 2026
+# Carnet: 202101149
+# Cambiar "mariano" -> por el usuario de tu distribución de linux
+# Cambiar "49" -> últimos dos dígitos de tu carnet (21)
+
+# ================================================================
+#                   SPRINT 1 — REVISIÓN P1
+# ================================================================
+
+#----------------- 1. MKDISK -----------------
+# ERROR PARAMETROS
+mkdisk -param=x -size=30 -path=/home/mariano/Calificacion_MIA/Discos/DiscoN.mia
+
+# ERROR PARAMETROS
+mkdisk -tamaño=3000 -unit=K -path=/home/mariano/Calificacion_MIA/Discos/DiscoN.mia
+
+# 50M — Disco1 (EXT2, particiones Part11..Part14)
+Mkdisk -size=50 -unit=M -fit=FF -path=/home/mariano/Calificacion_MIA/Discos/Disco1.mia
+
+# 50M — Disco2 (sin usar todavía)
+Mkdisk -unit=k -size=51200 -fit=BF -path=/home/mariano/Calificacion_MIA/Discos/Disco2.mia
+
+# 13M — Disco3 (EXT3, Part31..Part32)
+mkDisk -size=13 -path=/home/mariano/Calificacion_MIA/Discos/Disco3.mia
+
+# 50M — Disco4 (EXT3 para journaling)
+mkdisk -size=51200 -unit=K -path=/home/mariano/Calificacion_MIA/Discos/Disco4.mia
+
+# 20M — Disco5
+mkDisk -size=20 -unit=M -fit=WF -path=/home/mariano/Calificacion_MIA/Discos/Disco5.mia
+
+# Discos temporales (se borrarán)
+Mkdisk -size=50 -unit=M -fit=FF -path=/home/mariano/Calificacion_MIA/Discos/Disco6.mia
+Mkdisk -size=50 -unit=M -fit=FF -path=/home/mariano/Calificacion_MIA/Discos/Disco7.mia
+mkdisk -size=51200 -unit=K -path=/home/mariano/Calificacion_MIA/Discos/Disco8.mia
+mkdisk -size=51200 -unit=K -path=/home/mariano/Calificacion_MIA/Discos/Disco9.mia
+mkdisk -size=51200 -unit=K -path=/home/mariano/Calificacion_MIA/Discos/Disco10.mia
+
+#----------------- 2. RMDISK -----------------
+# ERROR DISCO NO EXISTE
+rmdisk -path=/home/mariano/Calificacion_MIA/Discos/DiscoN.mia
+
+# Borrar discos temporales
+rmdisk -path=/home/mariano/Calificacion_MIA/Discos/Disco6.mia
+rmdisk -path=/home/mariano/Calificacion_MIA/Discos/Disco7.mia
+rmdisk -path=/home/mariano/Calificacion_MIA/Discos/Disco8.mia
+rmdisk -path=/home/mariano/Calificacion_MIA/Discos/Disco9.mia
+rmdisk -path=/home/mariano/Calificacion_MIA/Discos/Disco10.mia
+
+#----------------- 3. FDISK -----------------
+# DISCO 1 — 4 primarias de 10M cada una
+fdisk -type=P -unit=b -name=PartErr -size=10485760 -path=/home/mariano/Calificacion_MIA/Discos/DiscoN.mia -fit=BF
+fdisk -type=P -unit=b -name=Part11  -size=10485760 -path=/home/mariano/Calificacion_MIA/Discos/Disco1.mia -fit=BF
+fdisk -type=P -unit=k -name=Part12  -size=10240    -path=/home/mariano/Calificacion_MIA/Discos/Disco1.mia -fit=BF
+fdisk -type=P -unit=M -name=Part13  -size=10       -path=/home/mariano/Calificacion_MIA/Discos/Disco1.mia -fit=BF
+fdisk -type=P -unit=b -name=Part14  -size=10485760 -path=/home/mariano/Calificacion_MIA/Discos/Disco1.mia -fit=BF
+
+# ERROR: límite de 4 particiones
+fdisk -type=P -unit=b -name=PartErr -size=10485760 -path=/home/mariano/Calificacion_MIA/Discos/Disco1.mia -fit=BF
+
+# DISCO 3 — particiones para EXT3
+fdisk -type=P -unit=m -name=PartErr -size=20 -path=/home/mariano/Calificacion_MIA/Discos/Disco3.mia
+fdisk -type=P -unit=m -name=Part31  -size=4  -path=/home/mariano/Calificacion_MIA/Discos/Disco3.mia
+fdisk -type=P -unit=m -name=Part32  -size=4  -path=/home/mariano/Calificacion_MIA/Discos/Disco3.mia
+fdisk -type=P -unit=m -name=Part33  -size=1  -path=/home/mariano/Calificacion_MIA/Discos/Disco3.mia
+
+# DISCO 4 — una partición grande para EXT3
+fdisk -type=P -unit=M -name=Part41  -size=40 -path=/home/mariano/Calificacion_MIA/Discos/Disco4.mia
+
+#----------------- 4. MOUNT -----------------
+# Disco 1
+mount -path=/home/mariano/Calificacion_MIA/Discos/Disco1.mia -name=Part11
+mount -path=/home/mariano/Calificacion_MIA/Discos/Disco1.mia -name=Part12
+
+# ERROR: ya montada
+mount -path=/home/mariano/Calificacion_MIA/Discos/Disco1.mia -name=Part11
+
+# Disco 3
+mount -path=/home/mariano/Calificacion_MIA/Discos/Disco3.mia -name=Part0
+mount -path=/home/mariano/Calificacion_MIA/Discos/Disco3.mia -name=Part31
+mount -path=/home/mariano/Calificacion_MIA/Discos/Disco3.mia -name=Part32
+
+# Disco 4 — para EXT3
+mount -path=/home/mariano/Calificacion_MIA/Discos/Disco4.mia -name=Part41
+
+# Listar montadas
+mounted
+
+#----------------- REPORTES P1 -----------------
+rep -id=A491  -Path=/home/mariano/Calificacion_MIA/Reportes/p1_rE.jpg     -name=mbr
+rep -id=491A  -Path=/home/mariano/Calificacion_MIA/Reportes/p1_r1_disk.jpg -name=disk
+rep -id=491A  -Path=/home/mariano/Calificacion_MIA/Reportes/p1_r2_mbr.jpg  -name=mbr
+rep -id=493B  -Path=/home/mariano/Calificacion_MIA/Reportes/p1_rE_mbr.jpg  -name=mbr
+rep -id=491B  -Path=/home/mariano/Calificacion_MIA/Reportes/p1_r3_disk.jpg -name=disk
+rep -id=492B  -Path=/home/mariano/Calificacion_MIA/Reportes/p1_r4_mbr.jpg  -name=mbr
+
+# ================================================================
+#             SPRINT 2 — MKFS EXT2 y EXT3
+# ================================================================
+
+#----------------- 5. MKFS EXT2 -----------------
+# 491A → EXT2 (igual que P1)
+mkfs -type=full -id=491A -fs=2fs
+
+# 492A → EXT2
+mkfs -type=full -id=492A -fs=2fs
+
+# ERROR: ID no montado
+mkfs -type=full -id=499Z -fs=2fs
+
+#----------------- 5. MKFS EXT3 -----------------
+# 491B → EXT3 (con journaling)
+mkfs -type=full -id=491B -fs=3fs
+
+# 492B → EXT3
+mkfs -type=full -id=492B -fs=3fs
+
+# 211A → EXT3 (Disco4 Part41)
+mkfs -type=full -id=211A -fs=3fs
+
+# ================================================================
+#        SPRINT 2 — SISTEMA DE ARCHIVOS: USUARIOS Y DIRS
+# ================================================================
+
+#----------------- LOGIN root en 491A -----------------
+login -user=root -pass=123 -id=491A
+
+# ERROR: sesión ya activa
+login -user=root -pass=123 -id=491A
+
+#----------------- MKGRP -----------------
+mkgrp -name=usuarios
+mkgrp -name=adm
+mkgrp -name=mail
+mkgrp -name=news
+mkgrp -name=sys
+
+# ERROR: grupo ya existe
+mkgrp -name=sys
+
+cat -file1=/users.txt
+
+#----------------- RMGRP -----------------
+rmgrp -name=mail
+
+cat -file1=/users.txt
+
+#----------------- MKUSR -----------------
+mkusr -user="usuario1" -pass=password -grp=root
+mkusr -user="user1"    -pass=abc      -grp=usuarios
+mkusr -user="user2"    -pass=abc      -grp=usuarios
+
+# ERROR: usuario ya existe
+mkusr -user="user2" -pass=abc -grp=usuarios
+
+# ERROR: grupo no existe
+mkusr -user="user3" -pass=abc -grp=system
+
+cat -file1=/users.txt
+
+#----------------- CHGRP -----------------
+chgrp -user=user2 -grp=adm
+
+cat -file1=/users.txt
+
+#----------------- RMUSR -----------------
+rmusr -user=user2
+
+cat -file1=/users.txt
+
+#----------------- MKDIR -----------------
+mkdir -path=/bin
+mkdir -path="/home/archivos/archivos 24"
+mkdir -p -path=/home/archivos/user/docs/usac
+mkdir -p -path=/home/archivos/carpeta1/carpeta2/carpeta3/carpeta4/carpeta5
+
+logout
+logout
+
+#----------------- LOGIN user1 -----------------
+login -user=user1 -pass=abc -id=491A
+logout
+
+#----------------- Volvemos a root -----------------
+login -user=root -pass=123 -id=491A
+
+#----------------- MKFILE -----------------
+mkfile -path=/home/archivos/user/docs/Tarea.txt  -size=75
+mkfile -path=/home/archivos/user/docs/Tarea2.txt -size=768
+mkfile -path=/home/archivos/user/docs/Tarea3.txt -size=10 -cont=/home/mariano/Calificacion_MIA/CONT/NAME.txt
+
+# ERROR: ruta no existe
+mkfile -path="/home/archivos/noexiste/b1.txt"
+
+# ERROR: size negativo
+mkfile -path="/home/archivos/b1.txt" -size=-45
+
+# Recursivo
+mkfile -r -path=/home/archivos/user/docs/usac/archivos/proyectos/fase1/entrada.txt
+
+cat -file1=/home/archivos/user/docs/Tarea2.txt
+cat -file1=/home/archivos/user/docs/Tarea3.txt
+
+#----------------- REPORTES P1/P4 en 491A -----------------
+rep -id=491A -path=/home/mariano/Calificacion_MIA/Reportes/p4_r1_inode.jpg   -name=inode
+rep -id=491A -path=/home/mariano/Calificacion_MIA/Reportes/p4_r2_block.jpg   -name=block
+rep -id=491A -path=/home/mariano/Calificacion_MIA/Reportes/p4_r3_bm_inode.txt -name=bm_inode
+rep -id=491A -path=/home/mariano/Calificacion_MIA/Reportes/p4_r4_bm_block.txt -name=bm_block
+rep -id=491A -path=/home/mariano/Calificacion_MIA/Reportes/p4_r5_sb.jpg      -name=sb
+rep -id=491A -path=/home/mariano/Calificacion_MIA/Reportes/p4_r6_file.txt    -path_file_ls=/home/archivos/user/docs/Tarea2.txt -name=file
+rep -id=491A -path=/home/mariano/Calificacion_MIA/Reportes/p4_r7_ls.jpg      -path_file_ls=/home/archivos/user/docs -name=ls
+rep -id=491A -path=/home/mariano/Calificacion_MIA/Reportes/p4_r8_tree.png    -name=tree
+
+logout
+
+# ================================================================
+#        SPRINT 2 — COMANDOS NUEVOS P2 (sobre 491A EXT2)
+# ================================================================
+
+login -user=root -pass=123 -id=491A
+
+#----------------- RENAME -----------------
+# Renombrar archivo existente
+rename -path=/home/archivos/user/docs/Tarea.txt -name=TareaRenombrada.txt
+
+# ERROR: ruta no existe
+rename -path=/home/archivos/user/docs/NoExiste.txt -name=Nuevo.txt
+
+cat -file1=/home/archivos/user/docs/TareaRenombrada.txt
+
+#----------------- COPY -----------------
+# Copiar archivo a otra carpeta
+copy -path=/home/archivos/user/docs/Tarea2.txt -destino=/home/archivos/carpeta1
+
+# Copiar carpeta completa (recursivo)
+copy -path=/home/archivos/user/docs/usac -destino=/home/archivos/carpeta1/carpeta2
+
+# ERROR: destino no existe
+copy -path=/home/archivos/user/docs/Tarea2.txt -destino=/home/archivos/noexiste
+
+rep -id=491A -path=/home/mariano/Calificacion_MIA/Reportes/p2_r1_tree_copy.png -name=tree
+
+#----------------- MOVE -----------------
+# Mover archivo
+move -path=/home/archivos/user/docs/TareaRenombrada.txt -destino=/home/archivos/carpeta1
+
+# ERROR: destino no existe
+move -path=/home/archivos/user/docs/Tarea2.txt -destino=/home/archivos/noexiste
+
+rep -id=491A -path=/home/mariano/Calificacion_MIA/Reportes/p2_r2_tree_move.png -name=tree
+
+#----------------- REMOVE -----------------
+# Eliminar archivo
+remove -path=/home/archivos/user/docs/Tarea2.txt
+
+# Eliminar carpeta (recursivo)
+remove -path=/home/archivos/carpeta1/carpeta2/carpeta3
+
+# ERROR: ruta no existe
+remove -path=/home/archivos/user/docs/NoExiste.txt
+
+rep -id=491A -path=/home/mariano/Calificacion_MIA/Reportes/p2_r3_tree_remove.png -name=tree
+
+#----------------- FIND -----------------
+# Buscar todos los .txt en /home
+find -path=/home -name="*.txt"
+
+# Buscar con comodín ?
+find -path=/home/archivos/user/docs -name="Tarea?.txt"
+
+# Buscar desde raíz
+find -path=/ -name="entrada.txt"
+
+# ERROR: ruta no existe
+find -path=/noexiste -name="*.txt"
+
+#----------------- CHMOD -----------------
+# Cambiar permisos de archivo
+chmod -path=/home/archivos/user/docs/Tarea3.txt -ugo=755
+
+# Cambiar permisos de carpeta recursivo
+chmod -path=/home/archivos/user -ugo=775 -r
+
+# ERROR: ugo inválido
+chmod -path=/home/archivos/user/docs/Tarea3.txt -ugo=999
+
+rep -id=491A -path=/home/mariano/Calificacion_MIA/Reportes/p2_r4_ls_chmod.jpg -path_file_ls=/home/archivos/user/docs -name=ls
+
+#----------------- CHOWN -----------------
+# Cambiar propietario de archivo
+chown -path=/home/archivos/user/docs/Tarea3.txt -usuario=user1
+
+# Cambiar propietario de carpeta recursivo
+chown -path=/home/archivos/user -usuario=user1 -r
+
+# ERROR: usuario no existe
+chown -path=/home/archivos/user/docs/Tarea3.txt -usuario=noexiste
+
+rep -id=491A -path=/home/mariano/Calificacion_MIA/Reportes/p2_r5_ls_chown.jpg -path_file_ls=/home/archivos/user/docs -name=ls
+
+logout
+
+# ================================================================
+#        SPRINT 2 — EXT3 y JOURNALING (sobre 491B)
+# ================================================================
+
+login -user=root -pass=123 -id=491B
+
+#----------------- Crear estructura en EXT3 -----------------
+mkdir -p -path=/home/user1/documentos
+mkdir -p -path=/home/user1/proyectos/mia
+
+mkfile -path=/home/user1/documentos/nota.txt  -size=50
+mkfile -path=/home/user1/documentos/readme.md -size=120
+mkfile -path=/home/user1/proyectos/mia/main.cpp -size=200
+
+cat -file1=/home/user1/documentos/nota.txt
+
+#----------------- Operaciones que generan journal -----------------
+rename -path=/home/user1/documentos/nota.txt -name=nota_v2.txt
+copy   -path=/home/user1/documentos/readme.md -destino=/home/user1/proyectos/mia
+move   -path=/home/user1/documentos/nota_v2.txt -destino=/home/user1/proyectos
+remove -path=/home/user1/proyectos/mia/readme.md
+
+chmod -path=/home/user1/proyectos/mia/main.cpp -ugo=700
+chown -path=/home/user1/proyectos -usuario=user1 -r
+
+#----------------- JOURNALING (ver entradas) -----------------
+journaling -id=491B
+
+#----------------- LOSS (simular pérdida de datos) -----------------
+# NOTA: loss borra bloques/inodos pero journaling permite recuperar
+loss -id=491B
+
+# Ver journal después del loss
+journaling -id=491B
+
+#----------------- Reportes EXT3 -----------------
+rep -id=491B -path=/home/mariano/Calificacion_MIA/Reportes/p2_ext3_r1_sb.jpg      -name=sb
+rep -id=491B -path=/home/mariano/Calificacion_MIA/Reportes/p2_ext3_r2_inode.jpg   -name=inode
+rep -id=491B -path=/home/mariano/Calificacion_MIA/Reportes/p2_ext3_r3_block.jpg   -name=block
+rep -id=491B -path=/home/mariano/Calificacion_MIA/Reportes/p2_ext3_r4_tree.png    -name=tree
+rep -id=491B -path=/home/mariano/Calificacion_MIA/Reportes/p2_ext3_r5_bm_inode.txt -name=bm_inode
+rep -id=491B -path=/home/mariano/Calificacion_MIA/Reportes/p2_ext3_r6_bm_block.txt -name=bm_block
+
+logout
+
+# ================================================================
+#        SPRINT 2 — FDISK ADD/DELETE (nuevos P2)
+# ================================================================
+
+#----------------- UNMOUNT -----------------
+unmount -id=492A
+
+# ERROR: ID no montado
+unmount -id=499Z
+
+mounted
+
+#----------------- FDISK DELETE -----------------
+# Borrado rápido (solo limpia MBR, no sobreescribe)
+fdisk -delete=fast -name=Part13 -path=/home/mariano/Calificacion_MIA/Discos/Disco1.mia
+
+# Borrado completo (sobreescribe con ceros)
+fdisk -delete=full -name=Part14 -path=/home/mariano/Calificacion_MIA/Discos/Disco1.mia
+
+# ERROR: partición montada, no se puede borrar
+fdisk -delete=fast -name=Part11 -path=/home/mariano/Calificacion_MIA/Discos/Disco1.mia
+
+rep -id=491A -path=/home/mariano/Calificacion_MIA/Reportes/p2_fdisk_r1_disk.jpg -name=disk
+rep -id=491A -path=/home/mariano/Calificacion_MIA/Reportes/p2_fdisk_r2_mbr.jpg  -name=mbr
+
+#----------------- FDISK ADD -----------------
+# Agregar espacio a partición existente (usa espacio libre del disco)
+fdisk -add=5 -unit=M -name=Part11 -path=/home/mariano/Calificacion_MIA/Discos/Disco1.mia
+
+# ERROR: no hay espacio suficiente
+fdisk -add=100 -unit=M -name=Part12 -path=/home/mariano/Calificacion_MIA/Discos/Disco1.mia
+
+rep -id=491A -path=/home/mariano/Calificacion_MIA/Reportes/p2_fdisk_r3_disk_add.jpg -name=disk
+
+# ================================================================
+#        RESUMEN FINAL — LISTAR TODO
+# ================================================================
+
+mounted
+
+rep -id=491A -path=/home/mariano/Calificacion_MIA/Reportes/p2_final_r1_tree.png    -name=tree
+rep -id=491B -path=/home/mariano/Calificacion_MIA/Reportes/p2_final_r2_tree.png    -name=tree
+rep -id=491A -path=/home/mariano/Calificacion_MIA/Reportes/p2_final_r3_sb.jpg      -name=sb
+rep -id=491B -path=/home/mariano/Calificacion_MIA/Reportes/p2_final_r4_sb.jpg      -name=sb

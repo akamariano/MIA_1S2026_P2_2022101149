@@ -118,3 +118,14 @@ void MountManager::unmountByPath(std::string path) {
         mountedPartitions.end()
     );
 }
+const std::vector<MountedPartition>& MountManager::getAll() {
+    return mountedPartitions;
+}
+
+void MountManager::unmountById(std::string id) {
+    mountedPartitions.erase(
+        std::remove_if(mountedPartitions.begin(), mountedPartitions.end(),
+            [&id](const MountedPartition& m) { return m.id == id; }),
+        mountedPartitions.end()
+    );
+}

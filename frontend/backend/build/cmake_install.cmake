@@ -1,4 +1,4 @@
-# Install script for directory: /home/mariano/MIA_1S2026_P1_202101149/frontend/backend
+# Install script for directory: /home/mariano/MIA_1S2026_P2_2022101149/frontend/backend
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -50,5 +50,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/home/mariano/MIA_1S2026_P1_202101149/frontend/backend/build/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/home/mariano/MIA_1S2026_P2_2022101149/frontend/backend/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

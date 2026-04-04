@@ -27,14 +27,16 @@ void RenameCmd::execute(const string& path, const string& newName) {
     SuperBlock sb;
     readSuperBlock(disk, part->start, sb);
 
-    // Verificar que el path existe
-    int targetInode = resolvePath(disk, sb, path);
+    // Resolver path y obtener el inodo padre en una sola llamada
+    int parentInode = -1;
+    int targetInode = resolvePath(disk, sb, path, &parentInode);
+
     if (targetInode == -1) {
         cout << "ERROR: La ruta '" << path << "' no existe\n";
         fclose(disk); return;
     }
 
-    // Verificar permisos de escritura
+    // Verificar permisos de escritura sobre el archivo/carpeta
     Inode targetInodeData;
     readInode(disk, sb, targetInode, targetInodeData);
     if (!Permissions::canWrite(targetInodeData)) {
@@ -42,38 +44,30 @@ void RenameCmd::execute(const string& path, const string& newName) {
         fclose(disk); return;
     }
 
-    // Obtener carpeta padre
-    string parentPath = "/";
-    size_t lastSlash = path.rfind('/');
-    if (lastSlash != string::npos && lastSlash > 0)
-        parentPath = path.substr(0, lastSlash);
-
-    int parentInode = resolvePath(disk, sb, parentPath);
-    if (parentInode == -1) {
-        cout << "ERROR: No se encontró carpeta padre\n";
-        fclose(disk); return;
-    }
-
-    // Verificar que el nuevo nombre no existe en el padre
+    // Verificar que el nuevo nombre no existe ya en el padre
     int existing = findInDirectory(disk, sb, parentInode, newName);
     if (existing != -1) {
         cout << "ERROR: Ya existe '" << newName << "' en el directorio\n";
         fclose(disk); return;
     }
 
-    // Buscar y renombrar la entrada en el directorio padre
+    // Buscar la entrada en el DirectoryBlock del padre y renombrarla
     Inode parent;
     readInode(disk, sb, parentInode, parent);
     bool renamed = false;
 
     for (int b = 0; b < 12 && !renamed; b++) {
         if (parent.i_block[b] == -1) break;
+
         DirectoryBlock db;
         readBlock(disk, sb, parent.i_block[b], &db);
+
         for (int e = 0; e < 4; e++) {
             if (db.b_content[e].b_inodo == targetInode) {
+                // Limpiar el nombre anterior y escribir el nuevo
                 memset(db.b_content[e].b_name, 0, 12);
                 strncpy(db.b_content[e].b_name, newName.c_str(), 11);
+                db.b_content[e].b_name[11] = '\0';
                 writeBlock(disk, sb, parent.i_block[b], &db);
                 renamed = true;
                 break;
@@ -82,13 +76,20 @@ void RenameCmd::execute(const string& path, const string& newName) {
     }
 
     if (!renamed) {
-        cout << "ERROR: No se pudo renombrar\n";
+        cout << "ERROR: No se pudo renombrar (entrada no encontrada en directorio padre)\n";
         fclose(disk); return;
     }
 
-    // Journaling
-    JournalManager::write(disk, sb, part->start, "rename",
-                          path, newName);
+    // Actualizar timestamps del padre e inodo renombrado
+    time_t now = time(nullptr);
+    parent.i_mtime = now;
+    writeInode(disk, sb, parentInode, parent);
+
+    targetInodeData.i_ctime = now;
+    writeInode(disk, sb, targetInode, targetInodeData);
+
+    // Journaling (solo EXT3)
+    JournalManager::write(disk, sb, part->start, "rename", path, newName);
 
     writeSuperBlock(disk, part->start, sb);
     fclose(disk);

@@ -11,9 +11,11 @@
 #include <iostream>
 #include <cstring>
 #include <string>
+#include <ctime>
 using namespace std;
 
-// Copia recursiva de un inodo hacia un destino
+// Copia recursiva de un inodo hacia destParentInode con nombre 'name'
+// No usa mkfile para evitar que resuelva paths desde root
 static void copyRecursive(FILE* disk, SuperBlock& sb, long long partStart,
                           int srcInode, int destParentInode,
                           const string& name,
@@ -28,13 +30,12 @@ static void copyRecursive(FILE* disk, SuperBlock& sb, long long partStart,
     }
 
     if (src.i_type == '0') {
-        // Es carpeta — crear en destino
+        // ── CARPETA: crear en destino y copiar hijos ──
         int newDir = EXT2Writer::createDirPublic(disk, sb, partStart,
                                                   destParentInode, name,
                                                   uid, gid);
         if (newDir == -1) return;
 
-        // Copiar hijos recursivamente
         for (int b = 0; b < 12; b++) {
             if (src.i_block[b] == -1) break;
             DirectoryBlock db;
@@ -50,8 +51,9 @@ static void copyRecursive(FILE* disk, SuperBlock& sb, long long partStart,
                               newDir, ename, uid, gid);
             }
         }
+
     } else {
-        // Es archivo — leer contenido y crear copia
+        // ── ARCHIVO: leer contenido del origen ──
         string content;
         for (int b = 0; b < 12; b++) {
             if (src.i_block[b] == -1) break;
@@ -63,7 +65,7 @@ static void copyRecursive(FILE* disk, SuperBlock& sb, long long partStart,
             if (toRead <= 0) break;
             content.append(fb.b_content, toRead);
         }
-        // Bloque indirecto
+        // Bloque indirecto simple
         if (src.i_block[12] != -1) {
             PointerBlock pb;
             readBlock(disk, sb, src.i_block[12], &pb);
@@ -79,9 +81,43 @@ static void copyRecursive(FILE* disk, SuperBlock& sb, long long partStart,
             }
         }
 
-        // Construir path destino y crear archivo
-        EXT2Writer::mkfile(disk, sb, partStart,
-                           name, false, 0, content, uid, gid);
+        // ── Crear nuevo inodo de archivo directamente en destParentInode ──
+        // NO usar mkfile() porque resuelve paths desde root
+        int newInodeNum = allocateInode(disk, sb, partStart);
+        if (newInodeNum == -1) {
+            cout << "ERROR: No hay inodos libres al copiar '" << name << "'\n";
+            return;
+        }
+
+        Inode newInode;
+        memset(&newInode, 0, sizeof(Inode));
+        newInode.i_uid   = uid;
+        newInode.i_gid   = gid;
+        newInode.i_size  = 0;
+        newInode.i_type  = '1'; // archivo
+        newInode.i_perm  = src.i_perm; // conservar permisos del original
+        newInode.i_atime = newInode.i_ctime = newInode.i_mtime = time(nullptr);
+        for (int i = 0; i < 15; i++) newInode.i_block[i] = -1;
+
+        // Escribir inodo vacío primero
+        writeInode(disk, sb, newInodeNum, newInode);
+
+        // Escribir contenido si hay
+        if (!content.empty()) {
+            EXT2Writer::writeFileContentPublic(disk, sb, partStart,
+                                               newInode, newInodeNum, content);
+        } else {
+            writeInode(disk, sb, newInodeNum, newInode);
+        }
+
+        // Registrar en el directorio destino
+        if (!addEntryToDirectory(disk, sb, partStart,
+                                  destParentInode, name, newInodeNum)) {
+            cout << "ERROR: No se pudo registrar '" << name << "' en destino\n";
+            return;
+        }
+
+        cout << "OK: Archivo '" << name << "' creado correctamente\n";
     }
 }
 
@@ -108,16 +144,19 @@ void CopyCmd::execute(const string& path, const string& destino) {
         fclose(disk); return;
     }
 
-    // Verificar destino existe
+    // Verificar destino existe y es carpeta
     int destInode = resolvePath(disk, sb, destino);
     if (destInode == -1) {
         cout << "ERROR: La carpeta destino '" << destino << "' no existe\n";
         fclose(disk); return;
     }
 
-    // Verificar permiso escritura en destino
     Inode destInodeData;
     readInode(disk, sb, destInode, destInodeData);
+    if (destInodeData.i_type != '0') {
+        cout << "ERROR: El destino '" << destino << "' no es una carpeta\n";
+        fclose(disk); return;
+    }
     if (!Permissions::canWrite(destInodeData)) {
         cout << "ERROR: No tiene permiso de escritura en '" << destino << "'\n";
         fclose(disk); return;
@@ -132,7 +171,7 @@ void CopyCmd::execute(const string& path, const string& destino) {
     int uid = SessionManager::get().uid;
     int gid = SessionManager::get().gid;
 
-    // Copiar recursivamente
+    // Copiar recursivamente con destino correcto
     copyRecursive(disk, sb, part->start,
                   srcInode, destInode, srcName, uid, gid);
 

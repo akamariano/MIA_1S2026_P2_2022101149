@@ -20,7 +20,9 @@ public:
     static std::string mount(std::string path, std::string name);
     static void showMounted();
     static MountedPartition* getMountedById(std::string id);
-    static void unmountByPath(std::string path);  // ✅ agregado
+    static void unmountByPath(std::string path);
+    static void unmountById(std::string id);
+    static const std::vector<MountedPartition>& getAll();
 };
 
 #endif

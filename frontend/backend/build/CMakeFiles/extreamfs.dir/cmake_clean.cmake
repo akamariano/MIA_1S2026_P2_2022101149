@@ -45,8 +45,6 @@ file(REMOVE_RECURSE
   "CMakeFiles/extreamfs.dir/core/commands/rmgrp.cpp.o.d"
   "CMakeFiles/extreamfs.dir/core/commands/rmusr.cpp.o"
   "CMakeFiles/extreamfs.dir/core/commands/rmusr.cpp.o.d"
-  "CMakeFiles/extreamfs.dir/core/commands/unmount_cmd.cpp.o"
-  "CMakeFiles/extreamfs.dir/core/commands/unmount_cmd.cpp.o.d"
   "CMakeFiles/extreamfs.dir/core/disk/disk_creator.cpp.o"
   "CMakeFiles/extreamfs.dir/core/disk/disk_creator.cpp.o.d"
   "CMakeFiles/extreamfs.dir/core/filesystem/ext2_reader.cpp.o"

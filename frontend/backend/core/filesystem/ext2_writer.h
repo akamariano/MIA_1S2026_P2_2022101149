@@ -39,6 +39,13 @@ public:
                                 int parentInode,
                                 const std::string& name,
                                 int uid, int gid);
+
+    // Escribe contenido en bloques de archivo (público para copy)
+    static bool writeFileContentPublic(FILE* disk, SuperBlock& sb,
+                                       long long partStart,
+                                       Inode& fileInode, int inodeNum,
+                                       const std::string& content);
+
 private:
     // Crea un inodo de carpeta y lo registra en su padre
     static int createDirectory(FILE* disk, SuperBlock& sb,
@@ -47,7 +54,7 @@ private:
                                const std::string& name,
                                int uid, int gid);
 
-    // Escribe contenido en bloques de archivo
+    // Escribe contenido en bloques de archivo (privado, llamado internamente)
     static bool writeFileContent(FILE* disk, SuperBlock& sb,
                                  long long partStart,
                                  Inode& fileInode, int inodeNum,

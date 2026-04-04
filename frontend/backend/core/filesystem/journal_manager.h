@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <vector>
 #include <algorithm>
+
 class JournalManager {
 public:
 
@@ -19,17 +20,12 @@ public:
                       const std::string& path,
                       const std::string& content = "") {
 
-        // Solo EXT3 tiene journal
         if (sb.s_filesystem_type != 3) return;
 
         int numJournals = sb.s_inodes_count;
-
-        // Calcular inicio del journal
-        // journal_start = partStart + sizeof(SuperBlock)
         long long journalStart = partStart + sizeof(SuperBlock);
 
-        // Buscar el siguiente slot libre (j_count == 0)
-        // o el slot con j_count más bajo para sobreescribir (circular)
+        // Buscar slot libre (j_count == 0) o el más antiguo (circular)
         int targetSlot = -1;
         int minCount   = -1;
 
@@ -51,7 +47,7 @@ public:
 
         if (targetSlot == -1) return;
 
-        // Leer el journal actual para obtener el count máximo
+        // Obtener count máximo actual
         int maxCount = 0;
         for (int i = 0; i < numJournals; i++) {
             Journal j;
@@ -66,9 +62,32 @@ public:
         memset(&entry, 0, sizeof(Journal));
         entry.j_count = maxCount + 1;
 
-        strncpy(entry.j_content.i_operation, operation.c_str(), 9);
-        strncpy(entry.j_content.i_path,      path.c_str(),      31);
-        strncpy(entry.j_content.i_content,   content.c_str(),   63);
+        // Operacion: hasta 9 chars + null
+        strncpy(entry.j_content.i_operation, operation.c_str(),
+                sizeof(entry.j_content.i_operation) - 1);
+
+        // Path: si es más largo que 31 chars, guardar los últimos 31
+        // para preservar la parte más informativa (nombre de archivo)
+        const int PATH_MAX_LEN = sizeof(entry.j_content.i_path) - 1;
+        std::string pathToStore = path;
+        if ((int)pathToStore.size() > PATH_MAX_LEN) {
+            // Intentar recortar desde un '/' para mantener legibilidad
+            std::string trimmed = pathToStore.substr(pathToStore.size() - PATH_MAX_LEN);
+            size_t slash = trimmed.find('/');
+            if (slash != std::string::npos)
+                pathToStore = trimmed.substr(slash); // empieza desde /
+            else
+                pathToStore = trimmed;
+        }
+        strncpy(entry.j_content.i_path, pathToStore.c_str(), PATH_MAX_LEN);
+
+        // Content: hasta 63 chars + null
+        const int CONTENT_MAX_LEN = sizeof(entry.j_content.i_content) - 1;
+        std::string contentToStore = content;
+        if ((int)contentToStore.size() > CONTENT_MAX_LEN)
+            contentToStore = contentToStore.substr(0, CONTENT_MAX_LEN);
+        strncpy(entry.j_content.i_content, contentToStore.c_str(), CONTENT_MAX_LEN);
+
         entry.j_content.i_date = (float)time(nullptr);
 
         // Escribir en disco
@@ -77,13 +96,13 @@ public:
         fwrite(&entry, sizeof(Journal), 1, disk);
     }
 
-    // Leer todos los journals de una partición
+    // Leer todos los journals activos de una partición
     static std::vector<Journal> readAll(FILE* disk, SuperBlock& sb,
                                          long long partStart) {
         std::vector<Journal> result;
         if (sb.s_filesystem_type != 3) return result;
 
-        int numJournals    = sb.s_inodes_count;
+        int numJournals = sb.s_inodes_count;
         long long journalStart = partStart + sizeof(SuperBlock);
 
         for (int i = 0; i < numJournals; i++) {
@@ -94,7 +113,7 @@ public:
             if (j.j_count > 0) result.push_back(j);
         }
 
-        // Ordenar por j_count
+        // Ordenar por j_count ascendente
         std::sort(result.begin(), result.end(),
                   [](const Journal& a, const Journal& b){
                       return a.j_count < b.j_count;
