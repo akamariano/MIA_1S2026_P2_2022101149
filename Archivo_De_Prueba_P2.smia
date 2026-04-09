@@ -381,6 +381,7 @@ fdisk -add=100 -unit=M -name=Part12 -path=/home/mariano/Calificacion_MIA/Discos/
 
 rep -id=491A -path=/home/mariano/Calificacion_MIA/Reportes/p2_fdisk_r3_disk_add.jpg -name=disk
 
+
 # ================================================================
 #        RESUMEN FINAL — LISTAR TODO
 # ================================================================

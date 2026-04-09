@@ -197,23 +197,41 @@ string processCommand(const string& rawInput) {
             if (path.empty() || name.empty()) { cout << "ERROR: -path y -name son obligatorios\n"; return; }
             Mount m; m.execute(path, name);
         }
-
-        // ================== MKFS ==================
-        else if (command == "mkfs") {
-            string id = "", type = "full";
+                // ================== UNMOUNT ==================
+        else if (command == "unmount") {
+            string id = "";
             for (int i = 1; i < (int)args.size(); i++) {
                 string p = args[i], lower = p;
                 transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-                if (lower.find("-id=")   == 0) id   = p.substr(4);
-                else if (lower.find("-type=") == 0) type = lower.substr(6);
+                if (lower.find("-id=") == 0) id = p.substr(4);
             }
             if (id.empty()) { cout << "ERROR: -id es obligatorio\n"; return; }
-            if (type != "full" && type != "ext3") {
-                cout << "ERROR: -type debe ser 'full' (EXT2) o 'ext3'\n"; return;
+            MountedPartition* part = MountManager::getMountedById(id);
+            if (!part) {
+                cout << "ERROR: ID '" << id << "' no está montado\n"; return;
             }
-            Mkfs mkfs; mkfs.execute(id, type);
+            MountManager::unmountById(id);
+            cout << "OK: Partición '" << id << "' desmontada correctamente\n";
         }
-
+        // ================== MKFS ==================
+               else if (command == "mkfs") {
+            string id = "", fs = "2fs";
+            for (int i = 1; i < (int)args.size(); i++) {
+                string p = args[i], lower = p;
+                transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+                if      (lower.find("-id=")   == 0) id = p.substr(4);
+                else if (lower.find("-fs=")   == 0) fs = lower.substr(4); // -fs=2fs o -fs=3fs
+                else if (lower.find("-type=") == 0) {
+                    // compatibilidad con -type=full (ignorar, solo usar -fs)
+                }
+            }
+            if (id.empty()) { cout << "ERROR: -id es obligatorio\n"; return; }
+            if (fs != "2fs" && fs != "3fs") {
+                cout << "ERROR: -fs debe ser '2fs' (EXT2) o '3fs' (EXT3)\n"; return;
+            }
+            Mkfs mkfs; mkfs.execute(id, fs);
+        }
+ 
         // ================== LOGIN ==================
         else if (command == "login") {
             string user = "", pass = "", id = "";

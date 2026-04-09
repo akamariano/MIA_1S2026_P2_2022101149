@@ -29,7 +29,7 @@ void Mkfs::execute(string id, string type) {
     long long partitionStart = part->start;
     long long partitionSize  = part->size;
 
-    bool isExt3 = (type == "ext3");
+    bool isExt3 = (type == "ext3" || type == "3fs");
 
     int n = 0;
 

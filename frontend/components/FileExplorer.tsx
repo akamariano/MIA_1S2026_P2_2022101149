@@ -5,7 +5,11 @@ import {
   MountedDisk, FileEntry
 } from "@/services/api";
 
-export default function FileExplorer() {
+interface FileExplorerProps {
+  onReady?: (refreshFn: () => void) => void;
+}
+
+export default function FileExplorer({ onReady }: FileExplorerProps) {
   const [disks, setDisks] = useState<MountedDisk[]>([]);
   const [selectedDisk, setSelectedDisk] = useState<MountedDisk | null>(null);
   const [currentPath, setCurrentPath] = useState("/");
@@ -16,15 +20,17 @@ export default function FileExplorer() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Cargar discos montados
   const loadDisks = async () => {
     const d = await getDisks();
     setDisks(d);
   };
 
-  useEffect(() => { loadDisks(); }, []);
+  useEffect(() => {
+    loadDisks();
+    // Exponer loadDisks al padre via callback
+    onReady?.(loadDisks);
+  }, []);
 
-  // Seleccionar disco y navegar a raíz
   const selectDisk = async (disk: MountedDisk) => {
     setSelectedDisk(disk);
     setCurrentPath("/");
@@ -34,7 +40,6 @@ export default function FileExplorer() {
     await navigate(disk, "/");
   };
 
-  // Navegar a carpeta
   const navigate = async (disk: MountedDisk, path: string) => {
     setLoading(true);
     setError(null);
@@ -50,7 +55,6 @@ export default function FileExplorer() {
     setLoading(false);
   };
 
-  // Abrir archivo
   const openFile = async (entry: FileEntry) => {
     if (!selectedDisk) return;
     const filePath = currentPath === "/"
@@ -63,7 +67,6 @@ export default function FileExplorer() {
     setLoading(false);
   };
 
-  // Navegar a subcarpeta
   const openFolder = async (entry: FileEntry) => {
     if (!selectedDisk) return;
     const newPath = currentPath === "/"
@@ -72,7 +75,6 @@ export default function FileExplorer() {
     await navigate(selectedDisk, newPath);
   };
 
-  // Ir atrás
   const goBack = async () => {
     if (!selectedDisk || currentPath === "/") return;
     const parts = currentPath.split("/").filter(Boolean);
@@ -81,7 +83,6 @@ export default function FileExplorer() {
     await navigate(selectedDisk, newPath);
   };
 
-  // Ver journaling
   const loadJournaling = async () => {
     if (!selectedDisk) return;
     setLoading(true);
@@ -102,7 +103,6 @@ export default function FileExplorer() {
         📁 Explorador del Sistema de Archivos
       </h2>
 
-      {/* Botón refrescar discos */}
       <button
         onClick={loadDisks}
         className="mb-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm"
@@ -110,7 +110,6 @@ export default function FileExplorer() {
         🔄 Refrescar Discos
       </button>
 
-      {/* Lista de discos */}
       {disks.length === 0 ? (
         <p className="text-slate-400 text-sm">No hay particiones montadas.</p>
       ) : (
@@ -134,10 +133,8 @@ export default function FileExplorer() {
         </div>
       )}
 
-      {/* Explorador de archivos */}
       {selectedDisk && (
         <div className="space-y-4">
-          {/* Barra de navegación */}
           <div className="flex items-center gap-2 bg-slate-700 rounded-lg p-2">
             <button
               onClick={goBack}
@@ -157,7 +154,6 @@ export default function FileExplorer() {
             </button>
           </div>
 
-          {/* Tabla de archivos */}
           {loading ? (
             <div className="text-center text-slate-400 py-8">Cargando...</div>
           ) : error ? (
@@ -219,7 +215,6 @@ export default function FileExplorer() {
             </div>
           )}
 
-          {/* Visor de archivo */}
           {fileContent !== null && (
             <div className="bg-slate-900 rounded-lg p-4">
               <div className="flex justify-between items-center mb-2">
@@ -239,7 +234,6 @@ export default function FileExplorer() {
             </div>
           )}
 
-          {/* Visor de journaling */}
           {journaling !== null && (
             <div className="bg-slate-900 rounded-lg p-4">
               <div className="flex justify-between items-center mb-2">

@@ -135,23 +135,26 @@ inline int findInDirectory(FILE* disk, const SuperBlock& sb,
                             int inodeNum, const std::string& name) {
     Inode inode;
     readInode(disk, sb, inodeNum, inode);
-
-    // Solo bloques directos por ahora (i_block[0..11])
+ 
+    // b_name solo tiene 12 bytes (11 útiles + null)
+    // Truncar el nombre buscado al mismo límite para comparar correctamente
+    std::string truncName = name.substr(0, 11);
+ 
     for (int b = 0; b < 12; b++) {
         if (inode.i_block[b] == -1) break;
-
         DirectoryBlock db;
         readBlock(disk, sb, inode.i_block[b], &db);
-
         for (int e = 0; e < 4; e++) {
             if (db.b_content[e].b_inodo == -1) continue;
-            if (strcmp(db.b_content[e].b_name, name.c_str()) == 0) {
+            // Comparar solo hasta 11 chars para manejar nombres largos
+            if (strncmp(db.b_content[e].b_name, truncName.c_str(), 11) == 0) {
                 return db.b_content[e].b_inodo;
             }
         }
     }
     return -1;
 }
+ 
 
 // Navega la ruta completa desde root (inodo 0)
 // Retorna inodo del último elemento, -1 si no existe

@@ -1,11 +1,14 @@
 "use client";
-
 import { useState, useRef } from "react";
 import TerminalInput from "./TerminalInput";
 import TerminalOutput from "./TerminalOutput";
 import { executeCommand } from "../services/api";
 
-export default function CommandPanel() {
+interface CommandPanelProps {
+  onScriptFinished?: () => void; // callback para refrescar el explorador
+}
+
+export default function CommandPanel({ onScriptFinished }: CommandPanelProps) {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState(">> Sistema listo. Backend en http://localhost:8080\n");
   const [loading, setLoading] = useState(false);
@@ -19,6 +22,7 @@ export default function CommandPanel() {
     setOutput(prev => prev + result + "\n");
     setInput("");
     setLoading(false);
+    onScriptFinished?.(); // refrescar explorador después de comando individual
   };
 
   const handleFileLoad = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -31,33 +35,35 @@ export default function CommandPanel() {
     reader.readAsText(file);
   };
 
+  // Enviar script completo en UNA sola request al backend
   const handleFileExecute = async () => {
     if (!input.trim()) return;
     setLoading(true);
     setOutput(">> Ejecutando script...\n");
 
+    // Formatear salida de comentarios y líneas vacías localmente
+    // mientras esperamos la respuesta del servidor
     const lines = input.split("\n");
-
+    let displayHeader = "";
     for (const line of lines) {
-      // Línea en blanco — preservar
       if (line.trim() === "") {
-        setOutput(prev => prev + "\n");
-        continue;
+        displayHeader += "\n";
+      } else if (line.trim().startsWith("#")) {
+        displayHeader += line + "\n";
+      } else {
+        break; // parar en el primer comando real
       }
-
-      // Comentario — mostrar tal como aparece
-      if (line.trim().startsWith("#")) {
-        setOutput(prev => prev + line + "\n");
-        continue;
-      }
-
-      // Comando — ejecutar y mostrar salida
-      setOutput(prev => prev + `> ${line}\n`);
-      const result = await executeCommand(line);
-      setOutput(prev => prev + result + "\n");
+    }
+    if (displayHeader) {
+      setOutput(prev => prev + displayHeader);
     }
 
+    // Enviar script completo de una vez
+    const result = await executeCommand(input);
+    setOutput(prev => prev + result + "\n");
+
     setLoading(false);
+    onScriptFinished?.(); // refrescar explorador al terminar el script
   };
 
   const handleClear = () => setOutput("");
@@ -75,7 +81,6 @@ export default function CommandPanel() {
           file:bg-indigo-600 file:text-white
           hover:file:bg-indigo-700"
         />
-
         <button
           onClick={handleFileExecute}
           disabled={loading}
@@ -83,9 +88,8 @@ export default function CommandPanel() {
           px-4 py-2 rounded-lg text-white font-medium
           hover:scale-105 transition disabled:opacity-50"
         >
-          {loading ? "Ejecutando..." : "Ejecutar Script"}
+          {loading ? "⏳ Ejecutando script..." : "▶ Ejecutar Script"}
         </button>
-
         <button
           onClick={handleExecute}
           disabled={loading}
@@ -95,7 +99,6 @@ export default function CommandPanel() {
         >
           {loading ? "..." : "Ejecutar"}
         </button>
-
         <button
           onClick={handleClear}
           className="bg-slate-700 px-4 py-2 rounded-lg text-white
@@ -104,7 +107,6 @@ export default function CommandPanel() {
           Limpiar
         </button>
       </div>
-
       <TerminalInput value={input} setValue={setInput} />
       <TerminalOutput output={output} />
     </div>

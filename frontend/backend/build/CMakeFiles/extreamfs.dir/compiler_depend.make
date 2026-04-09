@@ -1280,7 +1280,43 @@ CMakeFiles/extreamfs.dir/core/commands/fdisk.cpp.o: ../core/commands/fdisk.cpp \
   /usr/include/string.h \
   /usr/include/strings.h \
   ../core/disk/mbr.h \
-  /usr/include/c++/11/ctime
+  /usr/include/c++/11/ctime \
+  ../core/disk/ebr.h \
+  /usr/include/c++/11/algorithm \
+  /usr/include/c++/11/utility \
+  /usr/include/c++/11/bits/stl_relops.h \
+  /usr/include/c++/11/bits/stl_algo.h \
+  /usr/include/c++/11/bits/algorithmfwd.h \
+  /usr/include/c++/11/bits/stl_heap.h \
+  /usr/include/c++/11/bits/stl_tempbuf.h \
+  /usr/include/c++/11/bits/uniform_int_dist.h \
+  /usr/include/c++/11/pstl/glue_algorithm_defs.h \
+  /usr/include/c++/11/functional \
+  /usr/include/c++/11/tuple \
+  /usr/include/c++/11/array \
+  /usr/include/c++/11/bits/uses_allocator.h \
+  /usr/include/c++/11/bits/invoke.h \
+  /usr/include/c++/11/bits/refwrap.h \
+  /usr/include/c++/11/bits/std_function.h \
+  /usr/include/c++/11/unordered_map \
+  /usr/include/c++/11/ext/aligned_buffer.h \
+  /usr/include/c++/11/bits/hashtable.h \
+  /usr/include/c++/11/bits/hashtable_policy.h \
+  /usr/include/c++/11/bits/enable_special_members.h \
+  /usr/include/c++/11/bits/node_handle.h \
+  /usr/include/c++/11/bits/unordered_map.h \
+  /usr/include/c++/11/bits/erase_if.h \
+  /usr/include/c++/11/pstl/execution_defs.h \
+  /usr/include/c++/11/climits \
+  /usr/lib/gcc/x86_64-linux-gnu/11/include/limits.h \
+  /usr/lib/gcc/x86_64-linux-gnu/11/include/syslimits.h \
+  /usr/include/limits.h \
+  /usr/include/x86_64-linux-gnu/bits/posix1_lim.h \
+  /usr/include/x86_64-linux-gnu/bits/local_lim.h \
+  /usr/include/linux/limits.h \
+  /usr/include/x86_64-linux-gnu/bits/posix2_lim.h \
+  /usr/include/x86_64-linux-gnu/bits/xopen_lim.h \
+  /usr/include/x86_64-linux-gnu/bits/uio_lim.h
 
 CMakeFiles/extreamfs.dir/core/commands/find_cmd.cpp.o: ../core/commands/find_cmd.cpp \
   /usr/include/stdc-predef.h \
@@ -9176,14 +9212,6 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 
 /usr/include/x86_64-linux-gnu/bits/types/sig_atomic_t.h:
 
-/usr/include/x86_64-linux-gnu/bits/posix2_lim.h:
-
-/usr/include/x86_64-linux-gnu/bits/local_lim.h:
-
-/usr/include/x86_64-linux-gnu/bits/posix1_lim.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/11/include/limits.h:
-
 /usr/include/x86_64-linux-gnu/bits/netdb.h:
 
 /usr/include/x86_64-linux-gnu/bits/mman-linux.h:
@@ -9219,10 +9247,6 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 ../core/server/server.cpp:
 
 ../core/reports/report_ls.cpp:
-
-/usr/include/x86_64-linux-gnu/bits/xopen_lim.h:
-
-../core/reports/report_inode.cpp:
 
 ../core/reports/report_disk.cpp:
 
@@ -9394,6 +9418,28 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 
 /usr/include/c++/11/ratio:
 
+/usr/include/linux/param.h:
+
+../core/filesystem/logout.h:
+
+/usr/include/c++/11/filesystem:
+
+/usr/include/asm-generic/posix_types.h:
+
+/usr/include/c++/11/bits/fstream.tcc:
+
+../core/commands/move_cmd.cpp:
+
+/usr/include/x86_64-linux-gnu/c++/11/bits/c++io.h:
+
+/usr/include/x86_64-linux-gnu/c++/11/bits/basic_file.h:
+
+/usr/include/c++/11/fstream:
+
+/usr/include/x86_64-linux-gnu/c++/11/bits/time_members.h:
+
+../core/commands/mkdisk.h:
+
 /usr/include/stdlib.h:
 
 /usr/include/c++/11/bits/string_view.tcc:
@@ -9407,8 +9453,6 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 /usr/include/c++/11/bits/cxxabi_forced.h:
 
 ../core/commands/chown_cmd.h:
-
-/usr/include/c++/11/fstream:
 
 /usr/include/x86_64-linux-gnu/bits/types/__fpos64_t.h:
 
@@ -9456,11 +9500,11 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 
 /usr/include/x86_64-linux-gnu/c++/11/bits/gthr-default.h:
 
-/usr/include/linux/limits.h:
+/usr/include/c++/11/bits/stl_deque.h:
 
-/usr/include/c++/11/bits/shared_ptr_base.h:
+../core/commands/mkdir_cmd.h:
 
-/usr/include/c++/11/bits/basic_string.h:
+/usr/include/x86_64-linux-gnu/gnu/stubs.h:
 
 /usr/include/x86_64-linux-gnu/asm/bitsperlong.h:
 
@@ -9487,6 +9531,10 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 ../core/commands/rmgrp.h:
 
 /usr/include/c++/11/bits/localefwd.h:
+
+../core/commands/mkdir_cmd.cpp:
+
+/usr/include/x86_64-linux-gnu/c++/11/bits/c++allocator.h:
 
 /usr/include/c++/11/regex:
 
@@ -9516,10 +9564,6 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 
 /usr/include/c++/11/bits/postypes.h:
 
-/usr/include/x86_64-linux-gnu/c++/11/bits/c++allocator.h:
-
-../core/commands/mkdir_cmd.cpp:
-
 ../core/commands/mount.h:
 
 /usr/include/x86_64-linux-gnu/c++/11/bits/gthr.h:
@@ -9533,6 +9577,10 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 /usr/include/c++/11/bits/regex.tcc:
 
 /usr/include/x86_64-linux-gnu/c++/11/bits/c++locale.h:
+
+../core/reports/report_inode.cpp:
+
+/usr/include/x86_64-linux-gnu/bits/xopen_lim.h:
 
 /usr/include/x86_64-linux-gnu/bits/statx.h:
 
@@ -9584,6 +9632,10 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 
 /usr/include/c++/11/bits/char_traits.h:
 
+../core/commands/mkdisk.cpp:
+
+/usr/include/asm-generic/errno-base.h:
+
 /usr/include/c++/11/ext/numeric_traits.h:
 
 ../core/commands/rmusr.cpp:
@@ -9614,10 +9666,6 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 
 /usr/include/x86_64-linux-gnu/bits/types/time_t.h:
 
-/usr/include/x86_64-linux-gnu/bits/uio_lim.h:
-
-/usr/include/c++/11/string:
-
 /usr/include/c++/11/chrono:
 
 /usr/include/x86_64-linux-gnu/bits/wordsize.h:
@@ -9625,12 +9673,6 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 /usr/include/x86_64-linux-gnu/bits/types/locale_t.h:
 
 /usr/include/x86_64-linux-gnu/bits/wctype-wchar.h:
-
-/usr/include/c++/11/climits:
-
-/usr/include/c++/11/bits/sstream.tcc:
-
-/usr/include/c++/11/new:
 
 /usr/include/x86_64-linux-gnu/bits/struct_mutex.h:
 
@@ -9656,10 +9698,6 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 
 /usr/include/c++/11/bits/ostream_insert.h:
 
-/usr/include/x86_64-linux-gnu/c++/11/bits/time_members.h:
-
-../core/commands/mkdisk.h:
-
 /usr/include/c++/11/tr1/gamma.tcc:
 
 /usr/include/x86_64-linux-gnu/gnu/stubs-64.h:
@@ -9671,6 +9709,8 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 /usr/include/c++/11/bits/range_access.h:
 
 /usr/include/x86_64-linux-gnu/bits/wchar.h:
+
+/usr/include/x86_64-linux-gnu/bits/local_lim.h:
 
 /usr/include/x86_64-linux-gnu/bits/fp-fast.h:
 
@@ -9716,12 +9756,6 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 
 /usr/include/linux/errno.h:
 
-/usr/lib/gcc/x86_64-linux-gnu/11/include/syslimits.h:
-
-/usr/include/c++/11/debug/debug.h:
-
-/usr/include/features-time64.h:
-
 /usr/include/c++/11/bits/regex_automaton.tcc:
 
 /usr/include/c++/11/ext/string_conversions.h:
@@ -9763,6 +9797,14 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 /usr/include/x86_64-linux-gnu/bits/waitstatus.h:
 
 /usr/include/c++/11/cstdint:
+
+/usr/include/c++/11/bits/shared_ptr_base.h:
+
+/usr/include/c++/11/bits/basic_string.h:
+
+/usr/include/linux/limits.h:
+
+/usr/include/x86_64-linux-gnu/bits/posix2_lim.h:
 
 /usr/include/x86_64-linux-gnu/bits/sigstack.h:
 
@@ -9860,6 +9902,14 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 
 /usr/include/c++/11/system_error:
 
+/usr/include/c++/11/bits/fs_fwd.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/struct___jmp_buf_tag.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/clockid_t.h:
+
+/usr/include/c++/11/bits/stl_bvector.h:
+
 /usr/include/c++/11/bits/vector.tcc:
 
 /usr/include/c++/11/bits/std_thread.h:
@@ -9887,10 +9937,6 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 ../core/filesystem/SuperBlock.h:
 
 ../core/filesystem/ext2_reader.h:
-
-../core/commands/move_cmd.cpp:
-
-/usr/include/x86_64-linux-gnu/c++/11/bits/c++io.h:
 
 /usr/include/c++/11/ostream:
 
@@ -9998,6 +10044,12 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 
 /usr/include/c++/11/bits/stl_relops.h:
 
+/usr/include/c++/11/debug/debug.h:
+
+/usr/include/features-time64.h:
+
+/usr/lib/gcc/x86_64-linux-gnu/11/include/syslimits.h:
+
 /usr/include/asm-generic/int-ll64.h:
 
 /usr/include/c++/11/bits/stl_algo.h:
@@ -10008,12 +10060,6 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 
 /usr/include/c++/11/bits/algorithmfwd.h:
 
-/usr/include/c++/11/bits/stl_deque.h:
-
-/usr/include/x86_64-linux-gnu/gnu/stubs.h:
-
-../core/commands/mkdir_cmd.h:
-
 ../core/reports/report_tree.cpp:
 
 /usr/include/c++/11/bits/std_abs.h:
@@ -10023,6 +10069,12 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 /usr/include/c++/11/tr1/beta_function.tcc:
 
 /usr/include/c++/11/array:
+
+/usr/include/c++/11/bits/sstream.tcc:
+
+/usr/include/c++/11/new:
+
+/usr/include/c++/11/climits:
 
 /usr/include/c++/11/bits/unique_lock.h:
 
@@ -10062,6 +10114,14 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 
 ../core/disk/mbr.h:
 
+/usr/lib/gcc/x86_64-linux-gnu/11/include/limits.h:
+
+/usr/include/x86_64-linux-gnu/bits/posix1_lim.h:
+
+/usr/include/c++/11/string:
+
+/usr/include/x86_64-linux-gnu/bits/uio_lim.h:
+
 ../core/commands/find_cmd.cpp:
 
 ../core/commands/find_cmd.h:
@@ -10071,27 +10131,3 @@ CMakeFiles/extreamfs.dir/include/main.cpp.o: ../include/main.cpp \
 ../core/commands/journaling_cmd.h:
 
 ../core/commands/loss_cmd.h:
-
-/usr/include/asm-generic/errno-base.h:
-
-../core/commands/mkdisk.cpp:
-
-/usr/include/x86_64-linux-gnu/c++/11/bits/basic_file.h:
-
-/usr/include/asm-generic/posix_types.h:
-
-/usr/include/c++/11/bits/fstream.tcc:
-
-/usr/include/linux/param.h:
-
-../core/filesystem/logout.h:
-
-/usr/include/c++/11/filesystem:
-
-/usr/include/x86_64-linux-gnu/bits/types/struct___jmp_buf_tag.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/clockid_t.h:
-
-/usr/include/c++/11/bits/stl_bvector.h:
-
-/usr/include/c++/11/bits/fs_fwd.h:
