@@ -6,5 +6,5 @@ CXX_DEFINES =
 
 CXX_INCLUDES = -I/home/mariano/MIA_1S2026_P2_2022101149/frontend/backend/include -I/home/mariano/MIA_1S2026_P2_2022101149/frontend/backend/core -I/home/mariano/MIA_1S2026_P2_2022101149/frontend/backend/core/mount -I/home/mariano/MIA_1S2026_P2_2022101149/frontend/backend/core/commands -I/home/mariano/MIA_1S2026_P2_2022101149/frontend/backend/core/filesystem -I/home/mariano/MIA_1S2026_P2_2022101149/frontend/backend/core/disk -I/home/mariano/MIA_1S2026_P2_2022101149/frontend/backend/core/reports
 
-CXX_FLAGS = -std=gnu++17
+CXX_FLAGS = -O3 -DNDEBUG -std=gnu++17
 

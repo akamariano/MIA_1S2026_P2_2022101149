@@ -1,4 +1,5 @@
-const API_URL = "http://localhost:8080";
+// En desarrollo usa localhost; en producción usa la URL del EC2
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 export async function executeCommand(command: string): Promise<string> {
   try {
@@ -82,6 +83,22 @@ export async function getFileContent(id: string, path: string): Promise<string |
     return data.content ?? null;
   } catch {
     return null;
+  }
+}
+
+export interface SessionInfo {
+  active: boolean;
+  username: string;
+  groupname: string;
+  partitionId: string;
+}
+
+export async function getSession(): Promise<SessionInfo> {
+  try {
+    const res = await fetch(`${API_URL}/session`);
+    return await res.json();
+  } catch {
+    return { active: false, username: "", groupname: "", partitionId: "" };
   }
 }
 

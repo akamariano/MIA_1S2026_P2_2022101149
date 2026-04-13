@@ -898,6 +898,20 @@ void startServer(int port) {
                         "application/json");
     });
 
+    // ===== GET /session =====
+    svr.Get("/session", [](const Request&, Response& res) {
+        const Session& s = SessionManager::get();
+        string json;
+        if (s.active) {
+            json = "{\"active\":true,\"username\":\"" + s.username +
+                   "\",\"groupname\":\"" + s.groupname +
+                   "\",\"partitionId\":\"" + s.partitionId + "\"}";
+        } else {
+            json = "{\"active\":false,\"username\":\"\",\"groupname\":\"\",\"partitionId\":\"\"}";
+        }
+        res.set_content(json, "application/json");
+    });
+
     // ===== GET /journaling?id=491B =====
     svr.Get("/journaling", [](const Request& req, Response& res) {
         if (!req.has_param("id")) {

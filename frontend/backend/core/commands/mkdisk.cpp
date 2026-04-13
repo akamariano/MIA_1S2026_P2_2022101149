@@ -37,7 +37,8 @@ void MkDisk::execute(int size, char unit, std::string fit, std::string path) {
     if (p.has_parent_path()) {
         std::error_code ec;
         std::filesystem::create_directories(p.parent_path(), ec);
-        if (ec) {
+        // Ignorar error si el directorio ya existe
+        if (ec && !std::filesystem::exists(p.parent_path())) {
             std::cout << "ERROR: No se pudo crear el directorio: " << ec.message() << "\n";
             return;
         }
