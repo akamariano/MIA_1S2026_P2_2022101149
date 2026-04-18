@@ -347,6 +347,153 @@ fdisk -add=100 -unit=M -name=Part12 -path=/home/ubuntu/Calificacion_MIA/Discos/D
 rep -id=491A -path=/home/ubuntu/Calificacion_MIA/Reportes/p2_fdisk_r3_disk_add.jpg -name=disk
 
 # ================================================================
+#        SPRINT 3 - PRUEBAS ADICIONALES
+# ================================================================
+
+# ----------------------------------------------------------------
+# A) CAT CON MULTIPLES ARCHIVOS (file1 + file2 + file3)
+# ----------------------------------------------------------------
+
+login -user=root -pass=123 -id=491A
+
+# 2 archivos concatenados
+cat -file1=/home/archivos/user/docs/Tarea3.txt -file2=/home/archivos/user/docs/usac/archivos/proyectos/fase1/entrada.txt
+
+# 3 archivos concatenados
+cat -file1=/home/archivos/user/docs/Tarea3.txt -file2=/home/archivos/user/docs/usac/archivos/proyectos/fase1/entrada.txt -file3=/home/archivos/carpeta1/Tarea2.txt
+
+# ERROR: archivo no existe
+cat -file1=/home/archivos/noexiste.txt
+
+logout
+
+# ----------------------------------------------------------------
+# B) DISCO2 Y DISCO5 - Particiones primarias nuevas
+#    IDs asignados en orden: 491D (Disco2-P1), 492D (Disco2-P2), 491E (Disco5-P1)
+# ----------------------------------------------------------------
+
+# Disco2 (50M BF) - 2 particiones primarias
+fdisk -type=P -unit=M -name=Part21 -size=20 -path=/home/ubuntu/Calificacion_MIA/Discos/Disco2.mia
+fdisk -type=P -unit=M -name=Part22 -size=15 -path=/home/ubuntu/Calificacion_MIA/Discos/Disco2.mia
+
+# ERROR: no hay espacio
+fdisk -type=P -unit=M -name=Part2Err -size=30 -path=/home/ubuntu/Calificacion_MIA/Discos/Disco2.mia
+
+mount -path=/home/ubuntu/Calificacion_MIA/Discos/Disco2.mia -name=Part21
+mount -path=/home/ubuntu/Calificacion_MIA/Discos/Disco2.mia -name=Part22
+
+mounted
+
+mkfs -type=full -id=491D -fs=2fs
+mkfs -type=full -id=492D -fs=2fs
+
+login -user=root -pass=123 -id=491D
+mkdir -p -path=/home/disco2/subdir
+mkfile -path=/home/disco2/subdir/archivo.txt -size=64
+cat -file1=/home/disco2/subdir/archivo.txt
+rep -id=491D -path=/home/ubuntu/Calificacion_MIA/Reportes/p3_d2_r1_tree.png -name=tree
+rep -id=491D -path=/home/ubuntu/Calificacion_MIA/Reportes/p3_d2_r2_sb.jpg   -name=sb
+logout
+
+# Disco5 (20M WF) - particion primaria EXT3
+fdisk -type=P -unit=M -name=Part51 -size=8 -path=/home/ubuntu/Calificacion_MIA/Discos/Disco5.mia
+
+mount -path=/home/ubuntu/Calificacion_MIA/Discos/Disco5.mia -name=Part51
+
+mkfs -type=full -id=491E -fs=3fs
+
+login -user=root -pass=123 -id=491E
+mkdir -p -path=/srv/datos
+mkfile -path=/srv/datos/info.txt -size=80
+rename -path=/srv/datos/info.txt -name=info_v2.txt
+journaling -id=491E
+rep -id=491E -path=/home/ubuntu/Calificacion_MIA/Reportes/p3_d5_r1_tree.png -name=tree
+rep -id=491E -path=/home/ubuntu/Calificacion_MIA/Reportes/p3_d5_r2_sb.jpg   -name=sb
+logout
+
+# ----------------------------------------------------------------
+# C) SESION DE USUARIO NO-ROOT (user1 en 491A)
+# ----------------------------------------------------------------
+
+login -user=user1 -pass=abc -id=491A
+
+# user1 lee archivos que le pertenecen (chown los asigno a user1 antes)
+cat -file1=/home/archivos/user/docs/Tarea3.txt
+
+# user1 crea un archivo propio
+mkfile -path=/home/archivos/user/docs/MiArchivo.txt -size=50
+
+# user1 ejecuta find en su directorio
+find -path=/home/archivos/user -name=*.txt
+
+# ERROR: usuario no existe en find (ruta invalida)
+find -path=/home/archivos/user -name=NoExisteEsteArchivo999.txt
+
+logout
+
+# ----------------------------------------------------------------
+# D) MOVE DE DIRECTORIO COMPLETO
+# ----------------------------------------------------------------
+
+login -user=root -pass=123 -id=491A
+
+# Mover directorio completo (no solo archivo)
+mkdir -p -path=/home/archivos/dirOrigen/subA/subB
+mkfile -path=/home/archivos/dirOrigen/subA/archivoA.txt -size=30
+mkfile -path=/home/archivos/dirOrigen/subA/subB/archivoB.txt -size=30
+
+rep -id=491A -path=/home/ubuntu/Calificacion_MIA/Reportes/p3_move_r1_antes.png -name=tree
+
+move -path=/home/archivos/dirOrigen -destino=/home/archivos/carpeta1/carpeta2
+
+# ERROR: origen no existe
+move -path=/home/archivos/noExiste -destino=/home/archivos/carpeta1
+
+rep -id=491A -path=/home/ubuntu/Calificacion_MIA/Reportes/p3_move_r2_despues.png -name=tree
+
+# ----------------------------------------------------------------
+# E) FIND CON MAS PATRONES
+# ----------------------------------------------------------------
+
+# Buscar por extension .md
+find -path=/ -name=*.md
+
+# Buscar con prefijo
+find -path=/home -name=Tarea*
+
+# Buscar directorio por nombre
+find -path=/ -name=docs
+
+# ERROR: ruta invalida
+find -path=/ruta/invalida -name=*.txt
+
+# ----------------------------------------------------------------
+# F) MKFILE CON -cont
+# ----------------------------------------------------------------
+
+mkfile -path=/home/archivos/user/docs/ConContenido.txt -size=100 -cont=/home/ubuntu/Calificacion_MIA/CONT/NAME.txt
+
+cat -file1=/home/archivos/user/docs/ConContenido.txt
+
+# ----------------------------------------------------------------
+# G) CHMOD Y CHOWN EDGE CASES
+# ----------------------------------------------------------------
+
+# chmod 600 (solo dueno lee/escribe)
+chmod -path=/home/archivos/user/docs/MiArchivo.txt -ugo=600
+
+# chmod 111 (solo ejecucion para todos)
+chmod -path=/home/archivos/user/docs/ConContenido.txt -ugo=111
+
+# chown como root a usuario1
+chown -path=/home/archivos/user/docs/ConContenido.txt -usuario=usuario1
+
+rep -id=491A -path=/home/ubuntu/Calificacion_MIA/Reportes/p3_final_r1_ls.jpg  -path_file_ls=/home/archivos/user/docs -name=ls
+rep -id=491A -path=/home/ubuntu/Calificacion_MIA/Reportes/p3_final_r2_tree.png -name=tree
+
+logout
+
+# ================================================================
 #        RESUMEN FINAL
 # ================================================================
 

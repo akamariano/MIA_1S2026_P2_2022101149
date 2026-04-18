@@ -84,6 +84,31 @@ void ChownCmd::execute(const string& path,
         }
     }
 
+    // Fallback: search other mounted partitions if user not found locally
+    if (newUid == -1) {
+        for (const auto& mp : MountManager::getAll()) {
+            if (mp.path == part->path && mp.start == part->start) continue;
+            FILE* otherDisk = fopen(mp.path.c_str(), "rb");
+            if (!otherDisk) continue;
+            SuperBlock otherSb;
+            readSuperBlock(otherDisk, mp.start, otherSb);
+            string otherUsers = EXT2Writer::readUsersFile(otherDisk, otherSb, mp.start);
+            fclose(otherDisk);
+            UsersData otherData = parseUsers(otherUsers);
+            for (auto& u : otherData.users) {
+                if (u.username == usuario && u.active) {
+                    newUid  = u.uid;
+                    newGroup = u.group;
+                    for (auto& g : otherData.groups) {
+                        if (g.name == newGroup && g.active) { newGid = g.gid; break; }
+                    }
+                    break;
+                }
+            }
+            if (newUid != -1) break;
+        }
+    }
+
     if (newUid == -1) {
         cout << "ERROR: El usuario '" << usuario << "' no existe\n";
         fclose(disk); return;

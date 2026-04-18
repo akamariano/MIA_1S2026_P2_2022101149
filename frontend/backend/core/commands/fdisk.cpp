@@ -351,11 +351,24 @@ void FDisk::executeAdd(int add, char unit, const string& name,
     if (addBytes > 0) {
         long long partEnd   = part.part_start + part.part_size;
         long long nextStart = mbr.mbr_tamano;
+        const auto& mounted = MountManager::getAll();
         for (int i = 0; i < 4; i++) {
             if (i == idx) continue;
             if (mbr.mbr_partitions[i].part_status == '1') {
                 long long s = mbr.mbr_partitions[i].part_start;
-                if (s >= partEnd && s < nextStart) nextStart = s;
+                if (s >= partEnd && s < nextStart) {
+                    // Only treat as blocker if currently mounted
+                    char nameBuf[17] = {};
+                    strncpy(nameBuf, mbr.mbr_partitions[i].part_name, 16);
+                    string pname(nameBuf);
+                    bool isMounted = false;
+                    for (const auto& mp : mounted) {
+                        if (mp.name == pname && mp.path == path) {
+                            isMounted = true; break;
+                        }
+                    }
+                    if (isMounted) nextStart = s;
+                }
             }
         }
         long long freeAfter = nextStart - partEnd;
