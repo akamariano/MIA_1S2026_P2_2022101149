@@ -1,370 +1,305 @@
-# Manual de Usuario - EXTREAMFS
+# Manual de Usuario — ExtreamFS
 
-| Nombre | Carnet|
-|----------|-------|
-| Mariano Roberto Rac Noguera| 202101149 |
+| Nombre | Carnet |
+|---|---|
+| Mariano Roberto Rac Noguera | 202101149 |
 
 ---
 
 ## Tabla de Contenidos
+
 1. [Introducción](#introducción)
-2. [Requisitos Previos](#requisitos-previos)
-3. [Instalación](#instalación)
-4. [Iniciar la Aplicación](#iniciar-la-aplicación)
-5. [Interfaz de Usuario](#interfaz-de-usuario)
-6. [Guía de Uso Paso a Paso](#guía-de-uso-paso-a-paso)
-7. [Operaciones Comunes](#operaciones-comunes)
-8. [Solución de Problemas](#solución-de-problemas)
+2. [Acceso al Sistema](#acceso-al-sistema)
+3. [Interfaz de Usuario](#interfaz-de-usuario)
+4. [Iniciar Sesión](#iniciar-sesión)
+5. [Ejecutar Comandos](#ejecutar-comandos)
+6. [Explorador de Archivos](#explorador-de-archivos)
+7. [Journal EXT3](#journal-ext3)
+8. [Comandos de referencia rápida](#comandos-de-referencia-rápida)
+9. [Solución de Problemas](#solución-de-problemas)
 
 ---
 
 ## Introducción
 
-**EXTREAMFS** es un simulador de sistema de archivos basado en la estructura EXT2. La aplicación proporciona una interfaz gráfica moderna construida con Next.js y un servidor backend en C++ que maneja todas las operaciones del sistema de archivos.
+**ExtreamFS** es un simulador de sistemas de archivos EXT2 y EXT3 accesible desde el navegador web. El sistema está desplegado en AWS: el frontend corre en S3 y el backend en EC2.
 
-Con EXTREAMFS puedes:
-- Crear y gestionar discos virtuales
-- Particionar discos con MBR y EBR
-- Implementar sistemas de archivos EXT2
-- Gestionar usuarios y grupos
-- Crear, leer, modificar y eliminar archivos
-- Generar reportes del estado del sistema
-- Visualizar la estructura del sistema de archivos
-
----
-
-## Requisitos Previos
-
-### Hardware
-- Procesador: Intel o compatible (x86_64)
-- RAM: Mínimo 2GB
-- Espacio en disco: 500MB disponibles
-- Pantalla: Resolución mínima 1024x768
-
-### Software
-- **Node.js** v16 o superior
-- **npm** v7 o superior
-- **CMake** v3.22 o superior
-- **Compilador C++** (g++ o clang)
-- **Linux/Mac/WSL** (Windows Subsystem for Linux)
+Con ExtreamFS puedes:
+- Crear discos virtuales y particiones
+- Formatear particiones como EXT2 o EXT3
+- Gestionar usuarios, grupos y permisos POSIX
+- Crear, copiar, mover, renombrar y eliminar archivos y carpetas
+- Buscar archivos por nombre y patrón
+- Ver el journal de operaciones en particiones EXT3
+- Generar reportes gráficos de la estructura interna del filesystem
 
 ---
 
-## Instalación
+## Acceso al Sistema
 
-### Paso 1: Descargar el Proyecto
-```bash
-cd /home/mariano/MIA_1S2026_P1_202101149
-```
+### URLs
 
-### Paso 2: Instalar Dependencias del Backend
-```bash
-cd frontend/backend
-mkdir build
-cd build
-cmake ..
-make
-```
+| Qué | URL |
+|---|---|
+| **Frontend (interfaz web)** | http://extreamfs-frontend-849279003367.s3-website-us-east-1.amazonaws.com |
+| **Backend (API)** | http://13.218.255.179:8080 |
+| **Verificar backend** | http://13.218.255.179:8080/status → responde `{"status":"ok"}` |
 
-### Paso 3: Instalar Dependencias del Frontend
-```bash
-cd ../..
-npm install
-```
-
----
-
-## Iniciar la Aplicación
-
-### Opción 1: Ejecución Completa (Recomendado)
-
-**Terminal 1 - Iniciar Backend:**
-```bash
-cd frontend/backend/build
-./extreamfs --server 8080
-```
-
-**Terminal 2 - Iniciar Frontend:**
-```bash
-cd frontend
-npm run dev
-```
-
-Luego abre tu navegador en: **http://localhost:3000**
-
-### Opción 2: Modo Consola
-```bash
-cd frontend/backend/build
-./extreamfs
-```
+No se requiere instalación. Solo abrir el link del frontend en cualquier navegador moderno.
 
 ---
 
 ## Interfaz de Usuario
 
-La interfaz de EXTREAMFS está dividida en varios componentes principales:
+La pantalla principal tiene tres zonas:
 
-![Interfaz Principal](./Documentacion/images/INTERFAZ.png)
-*Figura 1: Interfaz principal de la aplicación*
+```
+┌────────────────────────────────────────────────────────┐
+│  ExtreamFS            [Sin sesión activa] [Iniciar Sesión] │
+├──────────────────────────┬─────────────────────────────┤
+│                          │                             │
+│   TERMINAL               │   EXPLORADOR DE ARCHIVOS    │
+│   ─────────              │   ──────────────────────    │
+│   Entrada:               │   [Refrescar]               │
+│   ┌──────────────────┐   │   Disco1.mia                │
+│   │                  │   │     └─ Part11 (491A)         │
+│   └──────────────────┘   │         └─ /home/           │
+│   [Examinar] [Ejecutar]  │             └─ archivo.txt  │
+│                          │                             │
+│   Salida:                │   [Panel de contenido]      │
+│   ┌──────────────────┐   │   (muestra el archivo       │
+│   │ # resultados     │   │    o el journal al hacer    │
+│   │ OK: ...          │   │    clic)                    │
+│   └──────────────────┘   │                             │
+└──────────────────────────┴─────────────────────────────┘
+```
 
-### Componentes Principales
+### Componentes
 
-#### 1. **Panel de Comandos** (Arriba a la izquierda)
-- Entrada de texto para escribir comandos
-- Botón de envío
-- Historial de comandos recientes
+| Componente | Función |
+|---|---|
+| **Barra superior** | Muestra usuario, grupo y partición activos; botón de sesión |
+| **Terminal — Entrada** | Escribe comandos o carga un archivo `.smia` |
+| **Terminal — Salida** | Muestra el resultado de cada comando (verde=OK, rojo=ERROR) |
+| **Botón Examinar** | Carga un archivo `.smia` para ejecutar como script |
+| **Botón Ejecutar** | Ejecuta el comando o script cargado |
+| **Explorador** | Navega discos → particiones → carpetas → archivos |
+| **Panel de contenido** | Muestra el contenido de un archivo al hacer clic en él |
 
-#### 2. **Terminal de Salida** (Centro)
-- Muestra los resultados de los comandos ejecutados
-- Historial de operaciones
-- Mensajes de suceso o error
-
-#### 3. **Explorador de Archivos** (Derecha)
-- Visualización de la estructura de directorios
-- Navegación por carpetas
-- Vista de propiedades de archivos
-
-#### 4. **Visualizador de Bloques** (Abajo)
-- Visualización de bloques del disco
-- Estado de asignación de bloques
-- Información de inodos
+![Vista general — discos montados y salida del script](images/captura_discos.png)
 
 ---
 
-## Guía de Uso Paso a Paso
+## Iniciar Sesión
 
-### Paso 1: Crear un Disco Virtual
-```bash
-mkdisk -size=100 -unit=M -fit=FF -path=/root/disco1.dsk
+### Opción A — Botón de la interfaz (recomendado)
+
+1. Clic en **"Iniciar Sesión"** (esquina superior derecha)
+2. Llenar el formulario:
+   - **ID Partición:** `491A` (partición formateada con EXT2/EXT3)
+   - **Usuario:** `root`
+   - **Contraseña:** `123`
+3. Clic en **Submit**
+4. La barra superior cambia a: `root | Grupo: root | Partición: 491A`
+
+### Opción B — Comando en el terminal
+
+```
+login -user=root -pass=123 -id=491A
 ```
 
-**Parámetros:**
-- `-size`: Tamaño del disco (número)
-- `-unit`: Unidad (K=Kilobytes, M=Megabytes, G=Gigabytes)
-- `-fit`: Estrategia (FF=First Fit, BF=Best Fit, WF=Worst Fit)
-- `-path`: Ruta donde se guardará el archivo
+### Cerrar sesión
 
-### Paso 2: Particionar el Disco
-```bash
-fdisk -size=50 -unit=M -type=P -fit=FF -delete=0 -name=p1 -path=/root/disco1.dsk
+Clic en **"Cerrar Sesión"** en la barra superior, o en el terminal:
 ```
-
-**Parámetros:**
-- `-size`: Tamaño de la partición
-- `-type`: Tipo (P=Primaria, E=Extendida, L=Lógica)
-- `-fit`: Estrategia de ajuste
-- `-name`: Nombre de la partición
-- `-path`: Ruta del disco
-
-### Paso 3: Crear Sistema de Archivos
-```bash
-mkfs -type=ext2 -fs=ext2 -id=p1 -path=/root/disco1.dsk
-```
-
-**Parámetros:**
-- `-type`: Tipo de formato (ext2)
-- `-fs`: Sistema de archivos
-- `-id`: ID de la partición
-- `-path`: Ruta del disco
-
-### Paso 4: Realizar Login
-```bash
-login -user=root -pass=123 -id=p1
-```
-
-**Parámetros:**
-- `-user`: Nombre de usuario
-- `-pass`: Contraseña
-- `-id`: ID de la partición
-
-### Paso 5: Crear Directorio
-```bash
-mkdir -name=/carpeta -path=/root/disco1.dsk
-```
-
-### Paso 6: Crear Archivo
-```bash
-mkfile -name=/archivo.txt -size=1024 -path=/root/disco1.dsk
-```
-
-### Paso 7: Ver Contenido de Archivo
-```bash
-cat -path=/root/disco1.dsk -file=/archivo.txt
+logout
 ```
 
 ---
 
-## Operaciones Comunes
+## Ejecutar Comandos
 
-### Gestión de Usuarios
+### Comando individual
 
-**Crear Usuario:**
-```bash
-mkusr -user=juan -pass=pass123 -id=p1
+Escribir el comando en el área de **Entrada** y presionar **Ejecutar** o `Enter`:
+```
+mkdir -p -path=/home/mis_archivos
 ```
 
-**Crear Grupo:**
-```bash
-mkgrp -name=developers -id=p1
+### Script completo
+
+1. Clic en **"Examinar"** → seleccionar el archivo `Archivo_De_Prueba_P2.smia`
+2. El script aparece en el área de Entrada
+3. Clic en **"Ejecutar Script"** → se ejecutan los ~221 comandos en secuencia
+4. Mientras corre, el botón muestra **"Ejecutando script..."**
+
+> Las líneas que empiezan con `#` son comentarios y se ignoran.
+
+---
+
+## Explorador de Archivos
+
+### Navegar el sistema de archivos
+
+1. Clic en **"Refrescar"** para cargar los discos montados
+2. Clic en un disco (ej. `Disco1.mia`) → aparecen sus particiones
+3. Clic en una partición (ej. `Part11 (491A)`) → abre el directorio raíz `/`
+4. Clic en una carpeta → entra en ella (el breadcrumb muestra la ruta)
+5. Clic en un archivo → el panel derecho muestra su contenido
+
+![Seleccionando Disco1.mia — muestra Part11 (491A)](images/captura_particion.png)
+
+![Raíz de Part11 — carpetas users.txt, bin, home y botón Journal](images/captura_raiz.png)
+
+![Contenido de un archivo navegando en profundidad](images/captura_archivo.png)
+
+### Información que muestra el explorador
+
+Para cada archivo o carpeta se muestran:
+- Nombre
+- Tipo (carpeta o archivo)
+- Permisos (ej. `rwxr-xr-x`)
+- Propietario (ej. `user1`)
+- Tamaño (para archivos)
+
+### Particiones disponibles después del script de prueba
+
+| ID | Disco | Partición | Tipo |
+|---|---|---|---|
+| 491A | Disco1.mia | Part11 | EXT2 |
+| 491B | Disco3.mia | Part31 | EXT3 |
+| 492B | Disco3.mia | Part32 | EXT3 |
+| 491C | Disco4.mia | Part41 | EXT3 |
+| 491D | Disco2.mia | Part21 | EXT2 |
+| 492D | Disco2.mia | Part22 | EXT2 |
+| 491E | Disco5.mia | Part51 | EXT3 |
+
+---
+
+## Journal EXT3
+
+Las particiones formateadas con EXT3 registran cada operación en un journal.
+
+### Ver el journal desde la interfaz
+
+1. Navegar a una partición EXT3 (ej. `491B`)
+2. Entrar a cualquier carpeta
+3. Aparece el botón **"Journal"** en la barra de navegación
+4. Clic en **Journal** → el panel derecho muestra la lista de operaciones:
+
+```
+[1] mkdir   /home/user1/documentos      2026-04-21 10:05:33
+[2] mkfile  /home/user1/documentos/nota.txt  2026-04-21 10:05:34
+[3] rename  /home/user1/documentos/nota.txt  → nota_v2.txt
+[4] copy    /home/user1/documentos/readme.md → /proyectos/mia
+[5] move    /home/user1/documentos/nota_v2.txt → /proyectos
+[6] remove  /home/user1/proyectos/mia/readme.md
+[7] chmod   /home/user1/proyectos/mia/main.cpp  → 700
+[8] chown   /home/user1/proyectos               → user1
 ```
 
-**Cambiar Grupo de Usuario:**
-```bash
-chgrp -user=juan -group=developers -id=p1
+### Ver el journal por comando
+
+```
+journaling -id=491B
 ```
 
-**Eliminar Usuario:**
-```bash
-rmusr -user=juan -id=p1
+### Simular pérdida de datos
+
+```
+loss -id=491B
 ```
 
-**Eliminar Grupo:**
+Esto borra el journal (simula corrupción). Después del `loss`, `journaling` muestra vacío.
+
+---
+
+## Comandos de referencia rápida
+
+### Flujo básico completo
+
 ```bash
-rmgrp -name=developers -id=p1
+# 1. Crear disco y partición
+mkdisk -size=50 -unit=M -fit=FF -path=/home/ubuntu/Calificacion_MIA/Discos/Disco1.mia
+fdisk -type=P -unit=M -name=Part11 -size=20 -path=/home/ubuntu/Calificacion_MIA/Discos/Disco1.mia
+
+# 2. Montar y formatear
+mount -path=/home/ubuntu/Calificacion_MIA/Discos/Disco1.mia -name=Part11
+mkfs -type=full -id=491A -fs=2fs
+
+# 3. Login y operaciones
+login -user=root -pass=123 -id=491A
+mkdir -p -path=/home/mis_docs
+mkfile -path=/home/mis_docs/nota.txt -size=100
+cat -file1=/home/mis_docs/nota.txt
+
+# 4. Permisos
+chmod -path=/home/mis_docs/nota.txt -ugo=644
+chown -path=/home/mis_docs/nota.txt -usuario=user1
+
+# 5. Reporte y logout
+rep -id=491A -path=/home/ubuntu/Calificacion_MIA/Reportes/tree.png -name=tree
+logout
 ```
 
-### Gestión de Discos
+### Comandos nuevos P2
 
-**Eliminar Disco:**
 ```bash
-rmdisk -path=/root/disco1.dsk
-```
+# FDISK — eliminar y ampliar
+fdisk -delete=fast -name=Part11 -path=Disco1.mia     # eliminar (rápido)
+fdisk -delete=full -name=Part11 -path=Disco1.mia     # eliminar (completo)
+fdisk -add=5 -unit=M -name=Part11 -path=Disco1.mia   # ampliar +5MB
+fdisk -add=-2 -unit=M -name=Part11 -path=Disco1.mia  # reducir -2MB
 
-**Montar Partición:**
-```bash
-mount -path=/root/disco1.dsk -name=p1
-```
+# UNMOUNT
+unmount -id=491A
 
-### Reportes
+# EXT3
+mkfs -type=full -id=491B -fs=3fs
+journaling -id=491B
+loss -id=491B
 
-**Generar Reporte MBR:**
-```bash
-rep -name=mbr -path=/root/disco1.dsk -id=p1
-```
+# Archivo y directorio
+rename -path=/home/archivo.txt -name=nuevo.txt
+copy   -path=/home/archivo.txt -destino=/home/backup
+move   -path=/home/archivo.txt -destino=/home/docs
+remove -path=/home/archivo.txt
 
-**Reporte de Bloques:**
-```bash
-rep -name=bm -path=/root/disco1.dsk -id=p1
-```
+# Búsqueda (soporta * y ?)
+find -path=/home -name=*.txt
+find -path=/ -name=Tarea?.txt
 
-**Reporte de Inodos:**
-```bash
-rep -name=bit -path=/root/disco1.dsk -id=p1
-```
-
-**Reporte de Árbol de Directorios:**
-```bash
-rep -name=tree -path=/root/disco1.dsk -id=p1
-```
-
-**Reporte de Listado de Archivos:**
-```bash
-rep -name=ls -path=/root/disco1.dsk -id=p1
+# CAT con múltiples archivos
+cat -file1=/home/a.txt -file2=/home/b.txt -file3=/home/c.txt
 ```
 
 ---
 
-## Pantallazos de Ejemplo
+## Ver reportes generados
 
-### Consola en Ejecución
-![Consola](./Documentacion/images/CONSOLAS.png)
-*Figura 2: Consola ejecutando comandos*
+Los reportes se generan en el EC2 y se pueden ver directamente desde el navegador:
 
-### Reportes del Sistema
+```
+http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/NOMBRE_REPORTE.png
+```
 
-#### Reporte MBR (Master Boot Record)
-![Reporte MBR](./Documentacion/images/disco1_mbr.jpg)
-*Figura 3: Estructura del MBR del disco*
-
-#### Reporte SuperBloque
-![SuperBloque](./Documentacion/images/disco1_sb.jpg)
-*Figura 4: Información del SuperBloque EXT2*
-
-#### Mapa de Bits de Bloques
-![Bloques](./Documentacion/images/disco1_block.jpg)
-*Figura 5: Mapa de bits de bloques asignados*
-
-#### Mapa de Bits de Inodos
-![Inodos](./Documentacion/images/disco1_inode.jpg)
-*Figura 6: Mapa de bits de inodos*
-
-#### Árbol de Directorios
-![Árbol](./Documentacion/images/disco1_tree.jpg)
-*Figura 7: Estructura jerárquica de directorios*
-
-#### Listado de Archivos y Documentos
-![Listado](./Documentacion/images/disco1_ls_docs.jpg)
-*Figura 8: Listado detallado de archivos y carpetas*
+Ejemplos:
+- [Árbol EXT2 final](http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_final_r1_tree.png)
+- [Árbol EXT3 final](http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_final_r2_tree.png)
+- [LS con permisos](http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_r4_ls_chmod.jpg)
+- [LS con propietario](http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_r5_ls_chown.jpg)
 
 ---
 
 ## Solución de Problemas
 
-### El servidor no inicia
-**Problema:** Error al conectar con el puerto 8080
-```
-Solución:
-1. Verifica que el puerto 8080 esté disponible
-2. Usa otro puerto: ./extreamfs --server 8081
-3. Termina cualquier proceso en el puerto 8080
-```
-
-### Interfaz no carga
-**Problema:** La página localhost:3000 no abre
-```
-Solución:
-1. Verifica que npm run dev está ejecutándose
-2. Recarga la página (Ctrl+R o Cmd+R)
-3. Revisa la consola del navegador (F12)
-4. Comprueba que no hay bloqueadores de puertos
-```
-
-### Comando rechazado
-**Problema:** Error "Usuario no autenticado"
-```
-Solución:
-1. Realiza login primero con: login -user=root -pass=123 -id=p1
-2. Verifica que la partición exista y esté formateada
-3. Comprueba la sintaxis del comando
-```
-
-### Disco no se monta
-**Problema:** Error al montar partición
-```
-Solución:
-1. Crea primero el sistema de archivos con mkfs
-2. Verifica que la ruta del disco sea correcta
-3. Asegúrate de tener permisos de lectura/escritura
-```
-
-### Espacio insuficiente
-**Problema:** No se pueden crear más archivos
-```
-Solución:
-1. Crea un disco más grande
-2. Elimina archivos no necesarios
-3. Revisa el espacio disponible con reportes
-```
-
----
-
-## Atajos de Teclado
-
-| Atajo | Función |
-|-------|---------|
-| Enter | Ejecutar comando |
-| Ctrl+C | Cancelar operación |
-| Ctrl+L | Limpiar terminal |
-| ↑/↓ | Navegar historial de comandos |
-
----
-
-## Consejos Útiles
-
-1. **Crea un disco de prueba pequeño** (10-50 MB) para empezar
-2. **Usa nombres descriptivos** para discos y particiones
-3. **Guarda los reportes** para diagnosticar problemas
-4. **Realiza login con root** antes de operar en el sistema
-5. **Verifica el árbol de directorios** antes de buscar archivos
-6. **Respalda tus discos** copiando los archivos .dsk
-
+| Problema | Causa probable | Solución |
+|---|---|---|
+| "No se pudo conectar al backend" | EC2 apagado o IP cambió | Verificar `http://13.218.255.179:8080/status` |
+| "No hay sesión activa" | Olvidó hacer login | `login -user=root -pass=123 -id=491A` |
+| "ID no montado" | Partición no montada | `mount -path=... -name=...` primero |
+| "El disco no existe" | Archivo .mia no creado | Ejecutar `mkdisk` primero |
+| "Límite de 4 particiones" | MBR lleno | Máximo 4 particiones por disco |
+| El explorador no muestra archivos | Partición no tiene mkfs | `mkfs -type=full -id=ID -fs=2fs` |
+| El journal aparece vacío | Se ejecutó `loss` | Normal después de simular pérdida |
+| Script corre muy lento | Latencia de red al EC2 | Normal — 221 comandos × red = ~3–5 min |

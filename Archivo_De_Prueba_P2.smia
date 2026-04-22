@@ -341,6 +341,9 @@ rep -id=491A -path=/home/ubuntu/Calificacion_MIA/Reportes/p2_fdisk_r2_mbr.jpg  -
 #----------------- FDISK ADD -----------------
 fdisk -add=5 -unit=M -name=Part11 -path=/home/ubuntu/Calificacion_MIA/Discos/Disco1.mia
 
+# Quitar espacio (add negativo)
+fdisk -add=-2 -unit=M -name=Part11 -path=/home/ubuntu/Calificacion_MIA/Discos/Disco1.mia
+
 # ERROR: no hay espacio suficiente
 fdisk -add=100 -unit=M -name=Part12 -path=/home/ubuntu/Calificacion_MIA/Discos/Disco1.mia
 

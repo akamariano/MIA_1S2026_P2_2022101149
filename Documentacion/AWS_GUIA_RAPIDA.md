@@ -8,8 +8,10 @@
 | Qué | URL |
 |---|---|
 | Frontend (S3) | http://extreamfs-frontend-849279003367.s3-website-us-east-1.amazonaws.com |
-| Backend API (EC2) | http://23.23.109.9:8080 |
-| Backend status | http://23.23.109.9:8080/status |
+| Backend API (EC2) | http://13.218.255.179:8080 |
+| Backend status | http://13.218.255.179:8080/status |
+
+> **`13.218.255.179` es una Elastic IP — no cambia aunque reinicies la instancia.**
 
 ---
 
@@ -20,11 +22,41 @@
 | EC2 Instance ID | `i-06056fe478a750f4f` |
 | EC2 tipo | `t3.micro` |
 | EC2 región | `us-east-1` (N. Virginia) |
-| Elastic IP | `23.23.109.9` |
-| Elastic IP Allocation ID | `eipalloc-0d41b20f8319ab766` |
-| Elastic IP Association ID | `eipassoc-073c5cdb430d952e9` |
+| **Elastic IP** | `13.218.255.179` (estática) |
+| Elastic IP Allocation ID | `eipalloc-0884d6576cb90f39c` |
+| Elastic IP Association ID | (se asigna al encender el EC2) |
 | S3 Bucket | `extreamfs-frontend-849279003367` |
 | SSH Key | `~/.ssh/extreamfs-key.pem` |
+
+---
+
+## Plan para la calificación
+
+**La Elastic IP `13.218.255.179` ya está asociada — IP fija, no cambia aunque reinicie el EC2.**
+
+Dejar el EC2 encendido hasta después de la calificación. Un t3.micro encendido hasta el 23 de abril = ~**$0.50 total**.
+
+### Después de la calificación — apagar todo ($0)
+
+```bash
+# Obtener association ID de la Elastic IP activa
+ASSOC_ID=$(aws ec2 describe-addresses --region us-east-1 \
+  --query 'Addresses[?InstanceId==`i-06056fe478a750f4f`].AssociationId' \
+  --output text)
+
+ALLOC_ID=$(aws ec2 describe-addresses --region us-east-1 \
+  --query 'Addresses[?InstanceId==`i-06056fe478a750f4f`].AllocationId' \
+  --output text)
+
+# Desasociar y liberar Elastic IP
+aws ec2 disassociate-address --association-id $ASSOC_ID --region us-east-1
+aws ec2 release-address --allocation-id $ALLOC_ID --region us-east-1
+
+# Detener el EC2
+aws ec2 stop-instances --instance-ids i-06056fe478a750f4f --region us-east-1
+
+echo "Todo apagado — costo $0"
+```
 
 ---
 
@@ -32,85 +64,46 @@
 
 | Situación | Costo |
 |---|---|
-| EC2 encendido + Elastic IP asignada | **$0.00** (Free Tier) |
-| EC2 apagado pero Elastic IP sin liberar | **~$0.005/hora** — EVITAR |
-| EC2 apagado + Elastic IP liberada | **$0.00** |
+| EC2 encendido (Free Tier activo) | **$0.00** |
+| EC2 encendido sin Free Tier | ~**$0.008/hora** (~$0.19/día) |
+| Elastic IP asociada a EC2 encendido | **$0.00** |
+| Elastic IP sin instancia asociada | **~$0.005/hora** — LIBERAR SIEMPRE |
 | S3 siempre | **$0.00** |
 
-> **Si apago el EC2, libero la Elastic IP. Si lo dejo encendido, no toco nada.**
+> **Regla:** Si apagas el EC2, libera la Elastic IP antes. Si lo dejas encendido, no toques nada.
 
 ---
 
-## Apagar todo ($0)
+## Ver la carpeta CalificacionMIA (SSH)
+
+La consola de AWS **no permite navegar el filesystem** del EC2 — solo muestra métricas y logs. Para ver los archivos necesitas SSH:
 
 ```bash
-# 1. Detener el EC2
-aws ec2 stop-instances --instance-ids i-06056fe478a750f4f --region us-east-1
+# Conectarse al EC2
+ssh -i ~/.ssh/extreamfs-key.pem ubuntu@13.218.255.179
 
-# 2. Desasociar la Elastic IP
-aws ec2 disassociate-address \
-  --association-id eipassoc-073c5cdb430d952e9 \
-  --region us-east-1
-
-# 3. Liberar la Elastic IP
-aws ec2 release-address \
-  --allocation-id eipalloc-0d41b20f8319ab766 \
-  --region us-east-1
-
-echo "Todo apagado — costo $0"
+# Ver la carpeta de calificación (actualiza la IP si cambió)
+ls -lh /home/ubuntu/Calificacion_MIA/
 ```
 
----
+Deberías ver los discos virtuales creados por el script de pruebas:
+```
+Disco1.mia   Disco2.mia   Disco3.mia   Disco4.mia   Disco5.mia
+```
 
-## Encender de nuevo
-
+Si la carpeta no existe (antes de correr las pruebas por primera vez):
 ```bash
-# 1. Encender el EC2
-aws ec2 start-instances --instance-ids i-06056fe478a750f4f --region us-east-1
-
-# 2. Esperar que esté running
-aws ec2 wait instance-running --instance-ids i-06056fe478a750f4f --region us-east-1
-
-# 3. Asignar nueva Elastic IP
-ALLOCATION=$(aws ec2 allocate-address --domain vpc --region us-east-1 \
-  --query '{AllocationId:AllocationId,PublicIp:PublicIp}' --output json)
-echo $ALLOCATION
-
-ALLOC_ID=$(echo $ALLOCATION | python3 -c "import sys,json; print(json.load(sys.stdin)['AllocationId'])")
-
-# 4. Asociar la IP al EC2
-aws ec2 associate-address \
-  --instance-id i-06056fe478a750f4f \
-  --allocation-id $ALLOC_ID \
-  --region us-east-1
-
-# 5. Ver la nueva IP
-NEW_IP=$(aws ec2 describe-addresses \
-  --allocation-ids $ALLOC_ID \
-  --query 'Addresses[0].PublicIp' \
-  --output text --region us-east-1)
-echo "Nueva IP: $NEW_IP"
-
-# 6. Actualizar el .env.production con la nueva IP
-sed -i "s|NEXT_PUBLIC_API_URL=.*|NEXT_PUBLIC_API_URL=http://$NEW_IP:8080|" \
-  /home/mariano/MIA_1S2026_P2_2022101149/frontend/.env.production
-
-# 7. Rebuild y redeploy del frontend
-cd /home/mariano/MIA_1S2026_P2_2022101149/frontend
-npm run build
-aws s3 sync out/ s3://extreamfs-frontend-849279003367/ --delete --region us-east-1 --quiet
-
-echo "Listo. Frontend: http://extreamfs-frontend-849279003367.s3-website-us-east-1.amazonaws.com"
+mkdir -p /home/ubuntu/Calificacion_MIA
 ```
 
-> **Nota:** Cada vez que apago y prendo el EC2 la Elastic IP cambia. Por eso hay que hacer el rebuild del frontend con la nueva IP. El backend en el EC2 inicia solo (systemd).
+El comando `mkdisk` del script crea los archivos `.mia` automáticamente en esa ruta.
 
 ---
 
 ## Verificar que todo anda
 
 ```bash
-# Estado del EC2
+# Estado del EC2 e IP actual
 aws ec2 describe-instances \
   --instance-ids i-06056fe478a750f4f \
   --region us-east-1 \
@@ -118,13 +111,13 @@ aws ec2 describe-instances \
   --output table
 
 # Verificar que el backend responde
-curl -s http://23.23.109.9:8080/status
+curl -s http://13.218.255.179:8080/status   # actualiza IP si cambió
 
 # SSH al EC2 (para ver logs o debuggear)
-ssh -i ~/.ssh/extreamfs-key.pem ubuntu@23.23.109.9
+ssh -i ~/.ssh/extreamfs-key.pem ubuntu@13.218.255.179
 
 # Ver logs del servicio backend en el EC2
-ssh -i ~/.ssh/extreamfs-key.pem ubuntu@23.23.109.9 "sudo journalctl -u extreamfs -n 50"
+ssh -i ~/.ssh/extreamfs-key.pem ubuntu@13.218.255.179 "sudo journalctl -u extreamfs -n 50"
 ```
 
 ---
@@ -135,8 +128,8 @@ ssh -i ~/.ssh/extreamfs-key.pem ubuntu@23.23.109.9 "sudo journalctl -u extreamfs
 # Backend: compilar localmente y copiar el binario al EC2
 cd /home/mariano/MIA_1S2026_P2_2022101149/frontend/backend/build
 make -j$(nproc)
-scp -i ~/.ssh/extreamfs-key.pem extreamfs ubuntu@23.23.109.9:~/extreamfs/extreamfs
-ssh -i ~/.ssh/extreamfs-key.pem ubuntu@23.23.109.9 "sudo systemctl restart extreamfs"
+scp -i ~/.ssh/extreamfs-key.pem extreamfs ubuntu@13.218.255.179:~/extreamfs/extreamfs
+ssh -i ~/.ssh/extreamfs-key.pem ubuntu@13.218.255.179 "sudo systemctl restart extreamfs"
 
 # Frontend: rebuild y sync a S3
 cd /home/mariano/MIA_1S2026_P2_2022101149/frontend
@@ -152,19 +145,19 @@ aws s3 sync out/ s3://extreamfs-frontend-849279003367/ --delete --region us-east
 Navegador
     │
     ▼
-AWS S3  ──────────────────────────────────────────
-    extreamfs-frontend-849279003367               │
-    Frontend Next.js (estático)                   │
-─────────────────────────────────────────────────  │
-                                     API calls     │
+AWS S3 ─────────────────────────────────────────────
+    extreamfs-frontend-849279003367
+    Frontend Next.js (estático)
+─────────────────────────────────────────────────────
+                                     API calls
                                           ▼
-AWS EC2 t3.micro ─────────────────────────────────
-    Ubuntu 22.04 | IP: 23.23.109.9 | Puerto: 8080
+AWS EC2 t3.micro ────────────────────────────────────
+    Ubuntu 22.04 | IP dinámica (ver sección URLs) | Puerto: 8080
     Backend C++ (extreamfs) — servicio systemd
-──────────────────────────────────────────────────
+─────────────────────────────────────────────────────
                     │
                     │ archivos .mia
                     ▼
-    /home/ubuntu/extreamfs/
-    Discos virtuales EXT2 / EXT3
+    /home/ubuntu/Calificacion_MIA/
+    Discos virtuales EXT2 / EXT3 (Disco1.mia … Disco5.mia)
 ```

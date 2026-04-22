@@ -1,301 +1,635 @@
 # Guía de Pruebas — ExtreamFS
 **Mariano Roberto Rac Noguera | 2022101149**
 
-Orden de pruebas, qué esperar ver en el frontend y cómo verificar que cada comando funciona correctamente.
+Notas personales para verificar el proyecto de punta a punta: qué ejecutar, qué debe salir en el terminal, y qué revisar visualmente en el frontend.
 
 ---
 
-## Antes de empezar
+## URLs activas
 
-1. Verificar que el backend está corriendo:
-   ```
-   http://23.23.109.9:8080/status  →  debe responder {"status":"ok"}
-   ```
-2. Abrir el frontend:
-   ```
-   http://extreamfs-frontend-849279003367.s3-website-us-east-1.amazonaws.com
-   ```
-3. El script completo de pruebas está en `Archivo_De_Prueba_P2.smia`.  
-   Puedes cargarlo con el botón de archivo en el terminal y ejecutarlo de una sola vez con **"Ejecutar Script"**, o ir sección por sección pegando los comandos en el área de entrada y presionando **"Ejecutar"**.
+| Servicio | URL |
+|---|---|
+| **Frontend** | `http://extreamfs-frontend-849279003367.s3-website-us-east-1.amazonaws.com` |
+| **Backend health** | `http://13.218.255.179:8080/status` → debe responder `{"status":"ok"}` |
+| **Script de pruebas** | `Archivo_De_Prueba_P2.smia` (raíz del proyecto) |
+
+> **`13.218.255.179` es una Elastic IP — no cambia aunque se reinicie el EC2.**
+
+---
+
+## ⚡ Guía rápida — Checks visuales del frontend
+
+Ejecutar el script completo y luego revisar estos puntos en el visualizador. Son los que más fácil se ven a primera vista.
+
+### 1. Sesión y barra de estado
+| Qué hacer | Qué debe verse |
+|---|---|
+| Abrir el frontend sin login | Barra superior: `Sin sesión activa` |
+| Clic en **"Iniciar Sesión"** → ID=`491A`, user=`root`, pass=`123` | Barra cambia a `root \| Grupo: root \| Partición: 491A` |
+| Botón esquina superior derecha | Cambia de **"Iniciar Sesión"** a **"Cerrar Sesión"** |
+| Clic en **"Cerrar Sesión"** | Barra vuelve a `Sin sesión activa` |
+
+### 2. Visualizador de discos y particiones
+| Qué hacer | Qué debe verse |
+|---|---|
+| Clic en **Refrescar** (después de correr el script) | Aparecen `Disco1.mia`, `Disco2.mia`, `Disco3.mia`, `Disco4.mia`, `Disco5.mia` |
+| Clic en `Disco1.mia` | Particiones: `Part11 (491A)` |
+| Clic en `Disco3.mia` | Particiones: `Part31 (491B)`, `Part32 (492B)` |
+| Clic en `Disco4.mia` | Partición: `Part41 (491C)` |
+| Clic en `Disco2.mia` | Particiones: `Part21 (491D)`, `Part22 (492D)` |
+| Clic en `Disco5.mia` | Partición: `Part51 (491E)` |
+
+### 3. Explorador de archivos — navegación
+| Qué hacer | Qué debe verse |
+|---|---|
+| Entrar a `491A` → `/` | Carpetas: `bin`, `home` |
+| Navegar `/home/archivos/user/docs` | Archivos: `Tarea3.txt`, `entrada.txt` (en usac/...), `MiArchivo.txt`, `ConContenido.txt` |
+| Clic en `Tarea3.txt` | Panel derecho muestra el contenido: `Contenido de prueba para Tarea3 MIA Proyecto 2` |
+| Navegar `/home/archivos/carpeta1` | Aparece `Tarea2.txt` (copiado), `TareaRenombrada.txt` (movido), `carpeta2/` |
+| Navegar `/home/archivos/carpeta1/carpeta2` | Contiene `dirOrigen/` (movido en Sprint 3) y carpeta `usac/` (copiada) |
+| Entrar a `491B` → `/home/user1/proyectos` | Carpetas: `mia/`, `nota_v2.txt` (movido desde documentos) |
+| Entrar a `491D` → `/home/disco2/subdir` | Archivo: `archivo.txt` |
+| Entrar a `491E` → `/srv/datos` | Archivo: `info_v2.txt` (renombrado desde info.txt) |
+
+### 4. Contenido de archivos
+| Qué hacer | Qué debe verse |
+|---|---|
+| Clic en `Tarea3.txt` (491A) | Contenido del archivo `NAME.txt` del EC2 |
+| Clic en `ConContenido.txt` (491A) | Mismo contenido que `NAME.txt` (creado con `-cont`) |
+| Clic en `archivo.txt` en 491D | Contenido generado aleatoriamente (bytes de relleno) |
+
+### 5. Permisos y propietario en el explorador
+Navegar a `491A → /home/archivos/user/docs` y verificar la columna de permisos:
+| Archivo | Permisos | Propietario |
+|---|---|---|
+| `Tarea3.txt` | `rwxr-xr-x` (755) | `user1` |
+| `MiArchivo.txt` | `rw-------` (600) | `user1` |
+| `ConContenido.txt` | `--x--x--x` (111) | `usuario1` |
+
+### 6. Journal de EXT3 (partición 491B)
+| Qué hacer | Qué debe verse |
+|---|---|
+| Entrar a `491B` → cualquier carpeta | Aparece botón **Journal** en la barra de ruta |
+| Clic en **Journal** | Panel con lista de operaciones: mkdir, mkfile, rename, copy, move, remove, chmod, chown |
+| Cada entrada del journal | Muestra: operación, ruta afectada, número de inodo, fecha |
+
+### 7. Reportes — links directos al navegador
+
+Base: `http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/`
+
+#### Reportes finales (estado completo del sistema)
+| Reporte | Link |
+|---|---|
+| Árbol EXT2 final (491A) | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_final_r1_tree.png |
+| Árbol EXT3 final (491B) | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_final_r2_tree.png |
+| Superbloque EXT2 final | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_final_r3_sb.jpg |
+| Superbloque EXT3 final | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_final_r4_sb.jpg |
+| Árbol Sprint3 EXT2 | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p3_final_r2_tree.png |
+| LS permisos+propietario | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p3_final_r1_ls.jpg |
+
+#### Comandos nuevos P2 (copy / move / remove / chmod / chown)
+| Reporte | Link |
+|---|---|
+| Árbol después de copy | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_r1_tree_copy.png |
+| Árbol después de move | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_r2_tree_move.png |
+| Árbol después de remove | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_r3_tree_remove.png |
+| LS chmod (permisos 755/600/111) | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_r4_ls_chmod.jpg |
+| LS chown (propietario user1) | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_r5_ls_chown.jpg |
+| Move dir completo (antes) | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p3_move_r1_antes.png |
+| Move dir completo (después) | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p3_move_r2_despues.png |
+
+#### EXT3 — 491B
+| Reporte | Link |
+|---|---|
+| Superbloque EXT3 | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_ext3_r1_sb.jpg |
+| Inodos EXT3 | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_ext3_r2_inode.jpg |
+| Bloques EXT3 | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_ext3_r3_block.jpg |
+| Árbol EXT3 | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_ext3_r4_tree.png |
+| Bitmap inodos EXT3 | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_ext3_r5_bm_inode.txt |
+| Bitmap bloques EXT3 | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_ext3_r6_bm_block.txt |
+
+#### Sprint 3 — Disco2 (491D/492D) y Disco5 (491E)
+| Reporte | Link |
+|---|---|
+| Árbol Disco2 (491D) | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p3_d2_r1_tree.png |
+| Superbloque Disco2 | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p3_d2_r2_sb.jpg |
+| Árbol Disco5 (491E) | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p3_d5_r1_tree.png |
+| Superbloque Disco5 | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p3_d5_r2_sb.jpg |
+
+#### Inodos / bloques / superbloque EXT2 (491A)
+| Reporte | Link |
+|---|---|
+| Inodos | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p4_r1_inode.jpg |
+| Bloques | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p4_r2_block.jpg |
+| Bitmap inodos | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p4_r3_bm_inode.txt |
+| Bitmap bloques | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p4_r4_bm_block.txt |
+| Superbloque | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p4_r5_sb.jpg |
+| Bloques de archivo | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p4_r6_file.txt |
+| LS directorio docs | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p4_r7_ls.jpg |
+| Árbol completo | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p4_r8_tree.png |
+
+#### FDISK (particiones eliminadas y ampliadas)
+| Reporte | Link |
+|---|---|
+| Disco1 antes de delete | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_fdisk_r1_disk.jpg |
+| MBR antes de delete | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_fdisk_r2_mbr.jpg |
+| Disco1 después de add (+5MB) | http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p2_fdisk_r3_disk_add.jpg |
+
+#### Discos — links directos (descargar .mia por SSH)
+Los archivos `.mia` están en el EC2, no son accesibles por browser. Para verlos:
+```bash
+ssh -i ~/.ssh/extreamfs-key.pem ubuntu@13.218.255.179 "ls -lh /home/ubuntu/Calificacion_MIA/Discos/"
+# Disco1.mia  Disco2.mia  Disco3.mia  Disco4.mia  Disco5.mia
+```
+
+### 8. Comando `mounted` — resultado esperado al final
+Pegar en el terminal del frontend:
+```
+mounted
+```
+Debe listar exactamente estas 7 particiones:
+```
+491A | Disco1.mia | Part11
+492B | Disco3.mia | Part32
+491B | Disco3.mia | Part31
+491C | Disco4.mia | Part41
+491D | Disco2.mia | Part21
+492D | Disco2.mia | Part22
+491E | Disco5.mia | Part51
+```
+> (El orden puede variar, lo importante es que estén todas.)
+
+---
+
+## Cómo cargar y ejecutar el script
+
+1. Abrir el frontend.
+2. En el panel del terminal (izquierda), clic en el ícono de carpeta **"Cargar archivo"**.
+3. Seleccionar `Archivo_De_Prueba_P2.smia`.
+4. El script aparece en el área de texto.
+5. Clic en **"Ejecutar Script"** → el sistema ejecuta los 220 comandos en secuencia.
+
+También puedes pegar comandos individuales en el input y presionar **"Ejecutar"** para pruebas puntuales.
+
+---
+
+## Checklist visual del frontend (antes de ejecutar cualquier script)
+
+Al abrir el frontend por primera vez deberías ver:
+
+- [ ] Header con el título **ExtreamFS**
+- [ ] Barra de sesión: `Sin sesión activa` (gris/rojo)
+- [ ] Botón **"Iniciar Sesión"** visible en la esquina superior derecha
+- [ ] Panel terminal vacío a la izquierda
+- [ ] Visualizador del sistema de archivos a la derecha (vacío, esperando particiones montadas)
+- [ ] El backend responde: pegar `rep -id=X` cualquiera o simplemente notar que el botón de estado muestra conexión
 
 ---
 
 ## Fase 1 — Discos y particiones
 
-### Qué se prueba
-- `mkdisk`: crear discos virtuales `.mia`
-- `rmdisk`: borrar discos
-- `fdisk`: crear particiones primarias/extendidas/lógicas
-- `mount`: montar particiones
-- `mounted`: listar particiones montadas
+**Script:** sección `SPRINT 1 - REVISION P1`
 
-### Cómo ejecutarlo
-Pegar o cargar la sección `SPRINT 1 - REVISION P1` del script en el terminal del frontend y ejecutar.
-
-### Qué ver en el terminal (Salida)
+### Qué ejecutar
 ```
-Disco creado: /home/ubuntu/Calificacion_MIA/Discos/Disco1.mia
-ERROR: parámetro inválido ...        ← líneas de error esperadas
-Partición creada: Part11
-Partición montada: 491A
-...
+mkdisk (5 discos) → rmdisk (5 discos temporales) → fdisk → mount → mounted → rep (mbr, disk)
 ```
-- Las líneas de error (`ERROR:`) en `mkdisk -param=x` y `fdisk` sobre disco inexistente son **correctas y esperadas** — prueban el manejo de errores.
-- El comando `mounted` al final debe listar: `491A, 492A, 491B, 492B, 211A, 211B`.
 
-### Qué ver en el Visualizador
-1. Presionar **Refrescar** en el Visualizador del Sistema de Archivos.
-2. Deben aparecer los íconos de disco: `Disco1.mia`, `Disco3.mia`, `Disco4.mia`.
-3. Hacer clic en `Disco1.mia` → aparecen las particiones `Part11 (491A)` y `Part12 (492A)`.
-4. En este punto las particiones no tienen sistema de archivos aún — si entras al explorador no habrá nada.
+### Qué debe verse en el terminal
+```
+ERROR: Parámetros inválidos          ← mkdisk con param incorrecto (esperado)
+OK: Disco creado correctamente ...   ← Disco1..Disco5
+ERROR: El disco no existe ...        ← rmdisk DiscoN (esperado)
+OK: Disco eliminado ...              ← Disco6..Disco10
+ERROR: No se pudo abrir el disco     ← fdisk en DiscoN (esperado)
+OK: Partición 'Part11' creada ...
+OK: Partición 'Part12' creada ...
+OK: Partición 'Part13' creada ...
+OK: Partición 'Part14' creada ...
+ERROR: Límite de 4 particiones ...   ← 5ta primaria (esperado)
+ERROR: No hay espacio suficiente ... ← PartErr 20MB en disco de 13MB (esperado)
+OK: Partición 'Part31' creada ...
+OK: Partición 'Part32' creada ...
+OK: Partición 'Part41' creada ...
+OK: Partición montada con ID: 491A   ← Part11 en Disco1
+OK: Partición montada con ID: 492A   ← Part12 en Disco1
+ERROR: La partición ya está montada  ← doble mount de Part11 (esperado)
+ERROR: Partición primaria 'Part0'... ← Part0 no existe en Disco3 (esperado)
+OK: Partición montada con ID: 491B   ← Part31 en Disco3
+OK: Partición montada con ID: 492B   ← Part32 en Disco3
+OK: Partición montada con ID: 491C   ← Part41 en Disco4
+```
+
+El comando `mounted` debe listar exactamente: **491A, 492A, 491B, 492B, 491C**
+
+Los reportes MBR y DISK para 491A y 491B deben responder:
+```
+OK: Reporte generado en /home/ubuntu/Calificacion_MIA/Reportes/p1_r1_disk.jpg
+```
+
+### Qué verificar en el Visualizador
+- [ ] Clic en **Refrescar** → aparecen 3 discos: `Disco1.mia`, `Disco3.mia`, `Disco4.mia`
+- [ ] Clic en `Disco1.mia` → aparecen `Part11 (491A)` y `Part12 (492A)`
+- [ ] Clic en `Disco3.mia` → aparecen `Part31 (491B)` y `Part32 (492B)`
+- [ ] Clic en `Disco4.mia` → aparece `Part41 (491C)`
+- [ ] Las particiones aún no tienen filesystem — navegar dentro muestra carpeta vacía (normal)
 
 ---
 
-## Fase 2 — Formateo EXT2 y EXT3 (MKFS)
+## Fase 2 — Formateo EXT2 y EXT3
 
-### Qué se prueba
-- `mkfs -fs=2fs`: formatear partición como EXT2
-- `mkfs -fs=3fs`: formatear partición como EXT3
-- Error con ID no montado
+**Script:** sección `SPRINT 2 - MKFS EXT2 y EXT3`
 
-### Cómo ejecutarlo
-Sección `SPRINT 2 - MKFS` del script.
-
-### Qué ver en el terminal
+### Qué debe verse en el terminal
 ```
-Partición 491A formateada como EXT2
-Partición 492A formateada como EXT2
-ERROR: ID 499Z no montado
-Partición 491B formateada como EXT3
-Partición 492B formateada como EXT3
+OK: Archivo '/users.txt' creado correctamente
+OK: MKFS realizado correctamente (EXT2)   ← 491A
+OK: MKFS realizado correctamente (EXT2)   ← 492A
+ERROR: ID no montado                      ← 499Z (esperado)
+OK: MKFS realizado correctamente (EXT3)   ← 491B
+OK: MKFS realizado correctamente (EXT3)   ← 492B
+ERROR: ID no montado                      ← 211A (esperado, no existe ese ID)
 ```
 
-### Qué ver en el Visualizador
-Después del mkfs, las particiones ya tienen estructura. Si entras a `491A`:
-- Verás la carpeta raíz `/` (carpeta vacía por ahora, sin usuarios ni archivos).
-- Esto confirma que el sistema de archivos se inicializó correctamente.
+### Qué verificar en el Visualizador
+- [ ] Clic en `Part11 (491A)` → ahora se ve la carpeta raíz `/` con el archivo `users.txt`
+- [ ] La carpeta `/` existe y se puede navegar (el filesystem ya existe)
 
 ---
 
-## Fase 3 — Login, usuarios y grupos
+## Fase 3 — Login y sesión
 
-### Qué se prueba
-- `login` / `logout`
-- `mkgrp` / `rmgrp`: crear y eliminar grupos
-- `mkusr` / `rmusr`: crear y eliminar usuarios
-- `chgrp`: cambiar grupo de un usuario
-- `cat /users.txt`: ver el archivo de usuarios
-- Errores: sesión ya activa, grupo duplicado, usuario duplicado, grupo inexistente
+**Script:** sección `SISTEMA DE ARCHIVOS: USUARIOS Y DIRS`
 
-### Cómo ejecutarlo
-Sección `SISTEMA DE ARCHIVOS: USUARIOS Y DIRS` del script.
+### Opción A — Login por comando (en el terminal)
+```
+login -user=root -pass=123 -id=491A
+```
 
-### Qué ver en el terminal
-- Después de cada `cat -file1=/users.txt` debe mostrarse el contenido del archivo de usuarios, parecido a:
-  ```
-  1,root,root,123
-  2,usuarios,,
-  3,adm,,
-  1,usuario1,root,password
-  2,user1,usuarios,abc
-  ...
-  ```
-- `ERROR: sesión ya activa` al intentar doble login — esperado.
-- `ERROR: grupo ya existe` en el segundo `mkgrp -name=sys` — esperado.
+### Opción B — Login por formulario (recomendado para mostrar la UI)
+1. Clic en **"Iniciar Sesión"** (esquina superior derecha)
+2. Llenar:
+   - **ID Partición:** `491A`
+   - **Usuario:** `root`
+   - **Contraseña:** `123`
+3. Clic en **Submit**
 
-### Qué ver en la pantalla principal
-- El botón en la esquina superior derecha cambia de **"Iniciar Sesión"** (azul) a **"Cerrar Sesión"** (rojo) cuando el login es exitoso.
-- La barra de sesión debajo del header muestra: `root | Grupo: root | Partición: 491A`.
+### Qué debe verse en el frontend después del login
+- [ ] Barra de sesión muestra: `root | Grupo: root | Partición: 491A`
+- [ ] Botón cambia a **"Cerrar Sesión"** (color diferente)
+- [ ] El terminal responde: `OK: Sesión iniciada`
 
-### Alternativa con el formulario de Login
-En vez de usar `login` por terminal, puedes usar la pantalla de Login:
-1. Presionar **"Iniciar Sesión"** (esquina superior derecha).
-2. Ingresar: ID Partición = `491A`, Usuario = `root`, Contraseña = `123`.
-3. Presionar Submit → regresa al home con la sesión activa.
+### Comandos de usuarios/grupos y qué esperar
+| Comando | Resultado esperado |
+|---|---|
+| `login` doble | `ERROR: Ya hay una sesión activa` |
+| `mkgrp -name=usuarios/adm/mail/news/sys` | `OK: Grupo 'X' creado con ID N` |
+| `mkgrp -name=sys` (segunda vez) | `ERROR: El grupo 'sys' ya existe` |
+| `cat -file1=/users.txt` | muestra contenido del archivo de usuarios |
+| `rmgrp -name=mail` | `OK: Grupo 'mail' eliminado` |
+| `mkusr -user=usuario1/user1/user2` | `OK: Usuario 'X' creado con ID N` |
+| `mkusr -user=user2` (segunda vez) | `ERROR: El usuario 'user2' ya existe` |
+| `mkusr -user=user3 -grp=system` | `ERROR: El grupo 'system' no existe` |
+| `chgrp -user=user2 -grp=adm` | `OK: Usuario 'user2' movido al grupo 'adm'` |
+| `rmusr -user=user2` | `OK: Usuario 'user2' eliminado` |
+| `logout` doble | segundo: `ERROR: No hay sesión activa` |
 
 ---
 
 ## Fase 4 — Directorios y archivos
 
-### Qué se prueba
-- `mkdir` / `mkdir -p`: crear directorios (simple y recursivo)
-- `mkfile`: crear archivos con tamaño aleatorio o contenido desde archivo
-- `cat`: leer contenido de un archivo
-- Errores: ruta inexistente, tamaño negativo
+**Script:** continuación después del login de root en 491A
 
-### Cómo ejecutarlo
-Continuación de la sección de usuarios (después del login de root en 491A).
+### Qué debe verse en el terminal
+```
+OK: Carpeta '/bin' creada correctamente
+ERROR: La carpeta padre 'home' no existe    ← mkdir sin -p (esperado)
+OK: Carpeta '/home/archivos/user/docs/usac' creada correctamente   ← mkdir -p
+OK: Carpeta '/home/archivos/carpeta1/.../carpeta5' creada ...
+OK: Sesión de 'root' cerrada correctamente
+OK: Sesión iniciada                          ← login user1
+OK: Sesión de 'user1' cerrada correctamente
+OK: Sesión iniciada                          ← login root de nuevo
+OK: Archivo '/home/archivos/user/docs/Tarea.txt' creado (75 bytes)
+OK: Archivo '/home/archivos/user/docs/Tarea2.txt' creado (768 bytes)
+OK: Archivo '/home/archivos/user/docs/Tarea3.txt' creado (con contenido)
+ERROR: La carpeta 'noexiste' no existe       ← mkfile ruta mala (esperado)
+ERROR: -size no puede ser negativo           ← size=-45 (esperado)
+OK: Archivo '.../fase1/entrada.txt' creado   ← mkfile -r recursivo
+```
 
-### Qué ver en el terminal
-- `mkdir -path=/bin` → `Directorio creado: /bin`
-- `mkdir -p -path=/home/archivos/carpeta1/carpeta2/carpeta3/carpeta4/carpeta5` → crea toda la jerarquía de una vez
-- `mkfile -size=75` → crea archivo con 75 bytes de contenido aleatorio
-- `cat -file1=/home/archivos/user/docs/Tarea3.txt` → debe mostrar el contenido del archivo `NAME.txt` que subiste al EC2 (`Contenido de prueba para Tarea3 MIA Proyecto 2`)
+El `cat` sobre `Tarea3.txt` debe mostrar:
+```
+Contenido de prueba para Tarea3 MIA Proyecto 2
+```
 
-### Qué ver en el Visualizador
-Esta es la parte visual más importante:
+### Qué verificar en el Visualizador
+- [ ] Refrescar → navegar `491A` → `/` → `home` → `archivos` → `user` → `docs`
+- [ ] Se ven los archivos: `Tarea.txt`, `Tarea2.txt`, `Tarea3.txt`, y la carpeta `usac`
+- [ ] Clic en `Tarea3.txt` → panel derecho muestra el contenido del archivo
+- [ ] Ruta en breadcrumb muestra: `/home/archivos/user/docs/Tarea3.txt`
 
-1. Presionar **Refrescar** en el Visualizador.
-2. Disco `Disco1.mia` → Partición `Part11 (491A)`.
-3. En `/` verás íconos de carpeta: `bin`, `home`.
-4. Entrar a `home` → `archivos` → `user` → `docs`.
-5. Verás los íconos de archivo: `Tarea2.txt`, `Tarea3.txt`, `Tarea.txt` (si no fue renombrado aún).
-6. Hacer clic en `Tarea3.txt` → se abre el **Visualizador de Archivos** mostrando el contenido del archivo.
-7. La barra de ruta arriba muestra el path completo: `/home/archivos/user/docs/Tarea3.txt`.
+### Reportes generados (verificar respuesta OK)
+- `p4_r1_inode.jpg` — inodos
+- `p4_r2_block.jpg` — bloques
+- `p4_r3_bm_inode.txt` — bitmap inodos
+- `p4_r4_bm_block.txt` — bitmap bloques
+- `p4_r5_sb.jpg` — superbloque
+- `p4_r6_file.txt` — bloques del archivo Tarea2.txt
+- `p4_r7_ls.jpg` — listado de /home/archivos/user/docs
+- `p4_r8_tree.png` — árbol completo
 
 ---
 
-## Fase 5 — Comandos nuevos P2 (sobre EXT2)
+## Fase 5 — Comandos nuevos P2 (sobre 491A EXT2)
 
-### Qué se prueba
-- `rename`: renombrar archivos/carpetas
-- `copy`: copiar archivos/carpetas
-- `move`: mover archivos/carpetas
-- `remove`: eliminar archivos/carpetas
-- `find`: buscar por nombre con wildcards
-- `chmod`: cambiar permisos (ugo=755, recursivo)
-- `chown`: cambiar propietario (recursivo)
+**Script:** sección `SPRINT 2 - COMANDOS NUEVOS P2`
 
-### Cómo ejecutarlo
-Sección `SPRINT 2 - COMANDOS NUEVOS P2`.
-
-### Qué ver en el terminal
+### rename
 ```
-Archivo renombrado a TareaRenombrada.txt
-Archivo copiado a /home/archivos/carpeta1
-ERROR: directorio destino no existe
-...
-find -path=/home -name=*.txt → lista todos los .txt en /home
+OK: '/home/archivos/user/docs/Tarea.txt' renombrado a 'TareaRenombrada.txt'
+ERROR: La ruta '.../NoExiste.txt' no existe    ← esperado
+```
+- [ ] Visualizador: en `docs` ya no está `Tarea.txt`, aparece `TareaRenombrada.txt`
+- [ ] `cat -file1=.../TareaRenombrada.txt` muestra contenido del archivo
+
+### copy
+```
+OK: '/home/archivos/user/docs/Tarea2.txt' copiado a '/home/archivos/carpeta1'
+OK: '/home/archivos/user/docs/usac' copiado a '/home/archivos/carpeta1/carpeta2'
+ERROR: La carpeta destino '.../noexiste' no existe    ← esperado
+```
+- [ ] Visualizador + reporte `p2_r1_tree_copy.png`: `Tarea2.txt` aparece en `carpeta1`; carpeta `usac` copiada dentro de `carpeta2`
+
+### move
+```
+OK: '.../TareaRenombrada.txt' movido a '/home/archivos/carpeta1'
+ERROR: La carpeta destino '.../noexiste' no existe    ← esperado
+```
+- [ ] Visualizador + reporte `p2_r2_tree_move.png`: `TareaRenombrada.txt` desaparece de `docs` y aparece en `carpeta1`
+
+### remove
+```
+OK: '/home/archivos/user/docs/Tarea2.txt' eliminado
+OK: '/home/archivos/carpeta1/carpeta2/carpeta3' eliminado    ← recursivo
+ERROR: La ruta '.../NoExiste.txt' no existe    ← esperado
+```
+- [ ] Visualizador + reporte `p2_r3_tree_remove.png`: `Tarea2.txt` ya no está en `docs`; `carpeta3` y todo su contenido eliminados
+
+### find
+El `find` muestra resultados en el terminal (sin prefijo OK:), no en el visualizador.
+```
+find -path=/home -name=*.txt       → lista todos los .txt bajo /home
+find -path=/home/.../docs -name=Tarea?.txt  → Tarea3.txt (patrón con ?)
+find -path=/ -name=entrada.txt     → /home/archivos/user/docs/usac/.../entrada.txt
+ERROR: La ruta '/noexiste' no existe    ← esperado
 ```
 
-### Qué verificar en el Visualizador después de cada bloque
-- **Después de rename:** navegar a `/home/archivos/user/docs` — `Tarea.txt` ya no existe, aparece `TareaRenombrada.txt`.
-- **Después de copy:** navegar a `/home/archivos/carpeta1` — debe aparecer `Tarea2.txt` copiado ahí.
-- **Después de move:** `TareaRenombrada.txt` desaparece de `docs` y aparece en `carpeta1`.
-- **Después de remove:** `Tarea2.txt` en `docs` ya no existe; `carpeta3` y su contenido tampoco.
-- **Permisos (chmod/chown):** en los íconos del explorador verás el string de permisos debajo del nombre, como `rwxr-xr-x`.
+### chmod
+```
+OK: Permisos de '.../Tarea3.txt' cambiados a 755
+OK: Permisos de '/home/archivos/user' cambiados a 775 (recursivo)
+ERROR: Cada dígito de -ugo debe estar entre 0 y 7    ← ugo=999 (esperado)
+```
+- [ ] Reporte `p2_r4_ls_chmod.jpg`: columna de permisos muestra `rwxr-xr-x` para Tarea3.txt
+
+### chown
+```
+OK: Propietario de '.../Tarea3.txt' cambiado a 'user1'
+OK: Propietario de '/home/archivos/user' cambiado a 'user1' (recursivo)
+ERROR: El usuario 'noexiste' no existe    ← esperado
+```
+- [ ] Reporte `p2_r5_ls_chown.jpg`: columna de propietario muestra `user1`
 
 ---
 
 ## Fase 6 — EXT3 y Journaling (sobre 491B)
 
-### Qué se prueba
-- Operaciones sobre partición EXT3 (`491B`)
-- `journaling -id=491B`: ver el diario de operaciones
-- `loss -id=491B`: simular pérdida del sistema y recuperación
+**Script:** sección `SPRINT 2 - EXT3 y JOURNALING`
 
-### Cómo ejecutarlo
-Sección `SPRINT 2 - EXT3 y JOURNALING`.
+### Qué debe verse en el terminal
+```
+OK: Sesión iniciada    ← login root en 491B
+OK: Carpeta '/home/user1/documentos' creada
+OK: Carpeta '/home/user1/proyectos/mia' creada
+OK: Archivo '.../nota.txt' creado (50 bytes)
+OK: Archivo '.../readme.md' creado (120 bytes)
+OK: Archivo '.../main.cpp' creado (200 bytes)
+OK: '.../nota.txt' renombrado a 'nota_v2.txt'
+OK: '.../readme.md' copiado a .../proyectos/mia
+OK: '.../nota_v2.txt' movido a .../proyectos
+OK: '.../readme.md' eliminado
+OK: Permisos de '.../main.cpp' cambiados a 700
+OK: Propietario de '.../proyectos' cambiado a 'user1' (recursivo)
+```
 
-### Qué ver en el terminal
-Después de `journaling -id=491B` debe aparecer algo como:
+Después de `journaling -id=491B`:
 ```
 Journal 491B:
-[1] mkdir /home/user1/documentos — 2026-01-15
-[2] mkdir /home/user1/proyectos/mia — 2026-01-15
-[3] mkfile /home/user1/documentos/nota.txt — 2026-01-15
-[4] rename /home/user1/documentos/nota.txt → nota_v2.txt — 2026-01-15
-...
+[1] mkdir  /home/user1/documentos      2026-...
+[2] mkdir  /home/user1/proyectos       2026-...
+[3] mkfile /home/user1/documentos/nota.txt    ...
+[4] rename /home/user1/documentos/nota.txt    ...
+[5] copy   /home/user1/documentos/readme.md   ...
+[6] move   /home/user1/documentos/nota_v2.txt ...
+[7] remove /home/user1/proyectos/mia/readme.md ...
+[8] chmod  /home/user1/proyectos/mia/main.cpp ...
+[9] chown  /home/user1/proyectos ...
 ```
-Después de `loss` y un segundo `journaling -id=491B`, el journal se reinicia (vacío o con entradas nuevas) — confirma que el sistema de pérdida funciona.
 
-### Qué ver en el Visualizador — botón Journal
-1. En el Visualizador, entrar a Disco → `Disco3.mia` → `Part31 (491B)`.
-2. Navegar a `/` o cualquier carpeta.
-3. Presionar el botón **Journal** en la barra de ruta.
-4. Se despliega el panel del diario mostrando todas las operaciones registradas.
+Después de `loss -id=491B`:
+```
+OK: Sistema de archivos EXT3 en '491B' simulado como perdido
+```
+
+El segundo `journaling -id=491B` después del `loss` muestra el journal vacío o reiniciado — confirma la recuperación.
+
+### Qué verificar en el Visualizador — Journal
+1. Navegar a `Disco3.mia` → `Part31 (491B)`
+2. Ir a cualquier carpeta (ej. `/home/user1/proyectos`)
+- [ ] Clic en botón **Journal** en la barra de ruta o panel
+- [ ] Se despliega la lista de operaciones: mkdir, mkfile, rename, copy, move, remove, chmod, chown
+- [ ] Cada entrada muestra operación, ruta e inodo afectado
+
+### Reportes EXT3 (todos deben responder OK)
+- `p2_ext3_r1_sb.jpg` — superbloque de 491B
+- `p2_ext3_r2_inode.jpg` — inodos
+- `p2_ext3_r3_block.jpg` — bloques
+- `p2_ext3_r4_tree.png` — árbol
+- `p2_ext3_r5_bm_inode.txt` — bitmap
+- `p2_ext3_r6_bm_block.txt` — bitmap
 
 ---
 
-## Fase 7 — FDISK ADD y DELETE
+## Fase 7 — FDISK DELETE y ADD
 
-### Qué se prueba
-- `unmount`: desmontar partición
-- `fdisk -delete=fast`: eliminar partición rápido (solo tabla)
-- `fdisk -delete=full`: eliminar partición y limpiar con `\0`
-- `fdisk -add=N`: agregar/quitar espacio a partición existente
-- Errores: partición montada al intentar borrar, espacio insuficiente
+**Script:** sección `SPRINT 2 - FDISK ADD/DELETE`
 
-### Cómo ejecutarlo
-Sección `SPRINT 2 - FDISK ADD/DELETE`.
-
-### Qué ver en el terminal
+### Qué debe verse en el terminal
 ```
-Partición 492A desmontada
-ERROR: ID 499Z no está montado
-Partición Part13 eliminada (fast)
-Partición Part14 eliminada (full)
-ERROR: no se puede eliminar Part11 — está montada
-5 MB agregados a Part11
-ERROR: no hay espacio suficiente en el disco
+OK: Partición '492A' desmontada correctamente
+ERROR: ID '499Z' no está montado    ← esperado
+--- PARTICIONES MONTADAS ---        ← mounted: 491A, 491B, 492B, 491C
+OK: Partición 'Part13' eliminada (fast)
+OK: Partición 'Part14' eliminada (full)
+ERROR: La partición 'Part11' está montada. Desmóntela antes    ← esperado
+OK: Reporte generado ...p2_fdisk_r1_disk.jpg
+OK: Reporte generado ...p2_fdisk_r2_mbr.jpg
+OK: Partición 'Part11' ampliada en 5242880 bytes    ← +5MB
+ERROR: No hay espacio libre suficiente ...           ← +100MB en Part12 (esperado)
+OK: Reporte generado ...p2_fdisk_r3_disk_add.jpg
 ```
 
-### Qué ver en el Visualizador
-- Presionar **Refrescar**.
-- `Disco1.mia` ahora solo debe mostrar `Part11 (491A)` — las otras particiones fueron eliminadas o desmontadas.
+### Qué verificar en el Visualizador
+- [ ] Refrescar → `Disco1.mia` ahora solo muestra `Part11 (491A)` (Part12 desmontada, Part13 y Part14 eliminadas)
+- [ ] El reporte `disk` debe mostrar `Part11` más grande (ahora 15MB)
 
 ---
 
-## Fase 8 — Reportes
+## Fase 8 — Sprint 3 (pruebas adicionales)
 
-Los reportes generan imágenes/texto en el EC2 en `/home/ubuntu/Calificacion_MIA/Reportes/`. Para verlos tienes que acceder por SSH o haberlos descargado antes. El frontend no los muestra directamente; el backend los genera como archivos.
+**Script:** sección `SPRINT 3 - PRUEBAS ADICIONALES`
 
-Tipos de reporte que se generan:
-- `disk` — distribución del disco (imagen)
-- `mbr` — tabla de particiones MBR (imagen)
-- `inode` — tabla de inodos (imagen)
-- `block` — bloques de datos (imagen)
-- `sb` — superbloque (imagen)
-- `bm_inode` — bitmap de inodos (texto)
-- `bm_block` — bitmap de bloques (texto)
-- `tree` — árbol del sistema de archivos (imagen)
-- `ls` — listado con permisos (imagen)
-- `file` — bloques de un archivo específico (texto)
+### A) cat con múltiples archivos
+```
+cat -file1=Tarea3.txt -file2=entrada.txt          → contenido de ambos concatenados
+cat -file1=Tarea3.txt -file2=entrada.txt -file3=Tarea2.txt  → tres archivos
+ERROR: El archivo '.../noexiste.txt' no existe     ← esperado
+```
 
-Para descargar los reportes del EC2:
+### B) Disco2 y Disco5 nuevos
+IDs asignados en orden: **491D** (Disco2/Part21), **492D** (Disco2/Part22), **491E** (Disco5/Part51 EXT3)
+
+```
+OK: Partición 'Part21' creada correctamente
+OK: Partición 'Part22' creada correctamente
+ERROR: No hay espacio suficiente ...    ← Part2Err 30MB (esperado)
+OK: Partición montada con ID: 491D
+OK: Partición montada con ID: 492D
+OK: MKFS realizado correctamente (EXT2)   ← 491D
+OK: MKFS realizado correctamente (EXT2)   ← 492D
+OK: Partición montada con ID: 491E
+OK: MKFS realizado correctamente (EXT3)   ← 491E
+```
+- [ ] Visualizador muestra ahora `Disco2.mia` y `Disco5.mia`
+- [ ] Navegando `491D` aparece `/home/disco2/subdir/archivo.txt`
+- [ ] `journaling -id=491E` muestra las operaciones de Disco5
+
+### C) Sesión de usuario1
+```
+OK: Sesión iniciada    ← user1 en 491A
+(cat, mkfile, find como user1)
+OK: Sesión de 'user1' cerrada correctamente
+```
+- [ ] Barra de sesión muestra: `user1 | Grupo: usuarios | Partición: 491A`
+
+### D) Move de directorio completo
+```
+OK: Carpeta '/home/archivos/dirOrigen/subA/subB' creada
+OK: '/home/archivos/dirOrigen' movido a '/home/archivos/carpeta1/carpeta2'
+ERROR: La ruta '/home/archivos/noExiste' no existe    ← esperado
+```
+- [ ] Reporte `p3_move_r2_despues.png`: `dirOrigen` ya no está en `/home/archivos`, aparece dentro de `carpeta2`
+
+### E) find con más patrones
+```
+find -path=/ -name=*.md        → readme.md en 491B
+find -path=/home -name=Tarea*  → TareaRenombrada.txt, Tarea3.txt...
+find -path=/ -name=docs        → /home/archivos/user/docs
+ERROR: La ruta '/ruta/invalida' no existe    ← esperado
+```
+
+### F) mkfile con -cont y G) chmod/chown edge cases
+```
+OK: Archivo '.../ConContenido.txt' creado
+(cat muestra el contenido del archivo NAME.txt)
+OK: Permisos de '.../MiArchivo.txt' cambiados a 600
+OK: Permisos de '.../ConContenido.txt' cambiados a 111
+OK: Propietario de '.../ConContenido.txt' cambiado a 'usuario1'
+```
+- [ ] Reporte `p3_final_r1_ls.jpg`: permisos `rw-------` (600) y `--x--x--x` (111) visibles
+
+---
+
+## Resumen final (al final del script)
+
+```
+mounted → lista todas las particiones: 491A, 491B, 492B, 491C, 491D, 492D, 491E
+```
+- [ ] Reporte `p2_final_r1_tree.png` (491A): árbol completo del sistema EXT2
+- [ ] Reporte `p2_final_r2_tree.png` (491B): árbol del sistema EXT3
+- [ ] Reporte `p2_final_r3_sb.jpg` (491A): superbloque EXT2
+- [ ] Reporte `p2_final_r4_sb.jpg` (491B): superbloque EXT3
+
+---
+
+## Cómo ver los reportes generados
+
+Los reportes `.jpg` / `.png` se guardan en el EC2 en `/home/ubuntu/Calificacion_MIA/Reportes/`. Hay dos formas de verlos:
+
+### Opción 1 — Desde el frontend (reporte individual)
+Si el visualizador tiene soporte para mostrar reportes, la URL directa es:
+```
+http://13.218.255.179:8080/report?path=/home/ubuntu/Calificacion_MIA/Reportes/p4_r8_tree.png
+```
+Pegar esa URL en el navegador para ver la imagen generada.
+
+### Opción 2 — Descargar por SCP desde tu máquina
 ```bash
 scp -i ~/.ssh/extreamfs-key.pem \
-  ubuntu@23.23.109.9:~/Calificacion_MIA/Reportes/* \
+  ubuntu@13.218.255.179:~/Calificacion_MIA/Reportes/* \
   ~/Desktop/reportes_mia/
-```
-
----
-
-## Flujo completo de demostración (para la entrega)
-
-Este es el orden recomendado para mostrar el proyecto funcionando de punta a punta:
-
-```
-1. Abrir frontend → mostrar que el backend responde (barra de sesión en rojo)
-2. Pegar y ejecutar sección MKDISK + FDISK + MOUNT en el terminal
-3. Refrescar el Visualizador → mostrar íconos de disco
-4. Seleccionar disco → mostrar íconos de partición
-5. Ejecutar MKFS en terminal
-6. Login desde la pantalla de Login (no por comando)
-   → mostrar barra de sesión en verde y botón "Cerrar Sesión"
-7. Ejecutar MKDIR + MKFILE en terminal
-8. Refrescar Visualizador → navegar carpetas → hacer clic en archivo → ver contenido
-9. Ejecutar RENAME + COPY + MOVE + REMOVE → refrescar y verificar cambios
-10. Cambiar a partición 491B (EXT3)
-11. Ejecutar MKDIR + MKFILE + journaling → ver Journal en el visualizador
-12. Ejecutar LOSS → ejecutar journaling de nuevo → confirmar recuperación
-13. Logout → botón vuelve a "Iniciar Sesión"
 ```
 
 ---
 
 ## Errores esperados (no son bugs)
 
-| Comando | Error | Por qué es correcto |
+| Comando | Error que aparece | Por qué es correcto |
 |---|---|---|
-| `mkdisk -param=x ...` | `ERROR: parámetro inválido` | Valida parámetros desconocidos |
-| `fdisk` en disco inexistente | `ERROR: disco no encontrado` | El disco no existe |
-| `fdisk` 5ta partición primaria | `ERROR: límite de particiones` | MBR solo admite 4 primarias |
-| `mount` partición ya montada | `ERROR: ya está montada` | No se puede montar dos veces |
-| `login` con sesión activa | `ERROR: sesión ya activa` | Solo una sesión a la vez |
-| `mkgrp` duplicado | `ERROR: grupo ya existe` | No se permiten duplicados |
-| `mkusr` en grupo inexistente | `ERROR: grupo no existe` | Integridad referencial |
-| `mkfile -size=-45` | `ERROR: tamaño inválido` | El tamaño debe ser positivo |
-| `fdisk -delete` en montada | `ERROR: partición montada` | Hay que desmontar primero |
-| `fdisk -add=100M` sin espacio | `ERROR: espacio insuficiente` | No cabe en el disco |
-| `unmount -id=499Z` | `ERROR: ID no montado` | El ID no existe |
+| `mkdisk -param=x` | `ERROR: Parámetros inválidos` | Rechaza parámetros desconocidos |
+| `rmdisk DiscoN.mia` | `ERROR: El disco no existe` | El archivo no existe |
+| `fdisk` en DiscoN | `ERROR: No se pudo abrir el disco` | No puede abrir disco inexistente |
+| `fdisk` 5ta primaria en Disco1 | `ERROR: Límite de 4 particiones` | MBR solo admite 4 primarias |
+| `fdisk` 20MB en disco de 13MB | `ERROR: No hay espacio suficiente` | No cabe en el disco |
+| `mount` Part0 en Disco3 | `ERROR: Partición primaria 'Part0' no encontrada` | No existe esa partición |
+| `mount` Part11 segunda vez | `ERROR: La partición ya está montada` | No se monta dos veces |
+| `mkfs -id=499Z` | `ERROR: ID no montado` | ID no asignado |
+| `mkfs -id=211A` | `ERROR: ID no montado` | Part41 recibió ID 491C, no 211A |
+| `login` doble | `ERROR: Ya hay una sesión activa` | Una sesión a la vez |
+| `logout` doble | `ERROR: No hay sesión activa` | No hay sesión que cerrar |
+| `mkgrp -name=sys` segunda vez | `ERROR: El grupo 'sys' ya existe` | No permite duplicados |
+| `mkusr -grp=system` | `ERROR: El grupo 'system' no existe` | El grupo no fue creado |
+| `mkusr -user=user2` segunda vez | `ERROR: El usuario 'user2' ya existe` | No permite duplicados |
+| `mkdir /home/archivos` sin -p | `ERROR: La carpeta padre 'home' no existe` | Sin -p no crea intermedios |
+| `mkfile -path=.../noexiste/...` | `ERROR: La carpeta 'noexiste' no existe` | La ruta padre no existe |
+| `mkfile -size=-45` | `ERROR: -size no puede ser negativo` | Tamaño inválido |
+| `rename` ruta inexistente | `ERROR: La ruta '...' no existe` | El archivo no existe |
+| `copy` / `move` destino malo | `ERROR: La carpeta destino '...' no existe` | Destino no existe |
+| `find` ruta inválida | `ERROR: La ruta '...' no existe` | Path de búsqueda no existe |
+| `chmod -ugo=999` | `ERROR: Cada dígito debe estar entre 0 y 7` | 9 no es octal válido |
+| `chown -usuario=noexiste` | `ERROR: El usuario 'noexiste' no existe` | Usuario no registrado |
+| `unmount -id=499Z` | `ERROR: ID '499Z' no está montado` | El ID no existe |
+| `fdisk -delete` en Part11 montada | `ERROR: La partición 'Part11' está montada` | Hay que desmontar primero |
+| `fdisk -add=100M` en Part12 | `ERROR: No hay espacio libre suficiente` | Solo hay ~30MB libres |
+| `fdisk` Part2Err 30MB en Disco2 | `ERROR: No hay espacio suficiente` | 35MB ya usados de 50MB |
+
+---
+
+## Flujo de repaso rápido
+
+```
+1. Abrir frontend → confirmar barra de sesión inactiva
+2. Cargar Archivo_De_Prueba_P2.smia → clic Ejecutar Script
+3. Mientras ejecuta: refrescar el Visualizador → confirmar que aparecen los íconos de disco
+4. Navegar: Disco1 → 491A → /home/archivos/user/docs → clic en Tarea3.txt
+   → confirmar que el contenido aparece en el panel derecho
+5. Cuando llegue la parte de login en el script:
+   → barra de sesión cambia a: root | root | 491A
+6. También probar el Login por formulario: botón "Iniciar Sesión" → llenar form manualmente
+7. Navegar el árbol de carpetas mientras el script corre
+8. Sección EXT3: ir a Disco3 → 491B → botón Journal
+   → revisar que las operaciones registradas aparecen correctamente
+9. Al final: mounted lista 7 particiones (491A, 491B, 492B, 491C, 491D, 492D, 491E)
+10. Logout desde el botón → barra de sesión vuelve a inactiva
+```

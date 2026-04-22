@@ -1,96 +1,150 @@
-# Manual Técnico - EXTREAMFS
-| Nombre | Carnet|
-|----------|-------|
-| Mariano Roberto Rac Noguera| 202101149 |
+# Manual Técnico — ExtreamFS
 
+| Nombre | Carnet |
+|---|---|
+| Mariano Roberto Rac Noguera | 202101149 |
 
 ---
 
 ## Tabla de Contenidos
+
 1. [Descripción General](#descripción-general)
 2. [Arquitectura del Sistema](#arquitectura-del-sistema)
-3. [Estructura de Carpetas](#estructura-de-carpetas)
-4. [Tecnologías Utilizadas](#tecnologías-utilizadas)
-5. [Estructuras de Datos](#estructuras-de-datos)
-6. [Comandos Implementados](#comandos-implementados)
-7. [Diagramas de Clase](#diagramas-de-clase)
-8. [Flujo de Ejecución](#flujo-de-ejecución)
-9. [Compilación y Construcción](#compilación-y-construcción)
-10. [Detalles de Implementación](#detalles-de-implementación)
+3. [Despliegue en AWS](#despliegue-en-aws)
+4. [Estructura de Carpetas](#estructura-de-carpetas)
+5. [Tecnologías Utilizadas](#tecnologías-utilizadas)
+6. [Estructuras de Datos](#estructuras-de-datos)
+7. [Sistema de Archivos EXT2](#sistema-de-archivos-ext2)
+8. [Sistema de Archivos EXT3 y Journaling](#sistema-de-archivos-ext3-y-journaling)
+9. [Comandos Implementados](#comandos-implementados)
+10. [API REST del Backend](#api-rest-del-backend)
+11. [Flujo de Ejecución](#flujo-de-ejecución)
+12. [Compilación](#compilación)
 
 ---
 
 ## Descripción General
 
-EXTREAMFS es un **simulador de sistema de archivos EXT2** que implementa:
+**ExtreamFS** es un simulador de sistemas de archivos EXT2 y EXT3 desarrollado como Proyecto 2 del curso Manejo e Implementación de Archivos (MIA), 1S 2026, FIUSAC.
 
-- **Gestión de Discos**: Creación, particionamiento y eliminación de discos virtuales
-- **Sistemas de Archivos**: Formato EXT2 completo con soporte para archivos y directorios
-- **Control de Acceso**: Sistema de usuarios, grupos y permisos POSIX
-- **Reportes**: Visualización gráfica de la estructura interna del sistema de archivos
-- **API HTTP**: Interfaz servidor para operaciones remotas
-- **Interfaz Web**: Frontend interactivo construido con Next.js
+El sistema permite:
+- Crear y gestionar discos virtuales (archivos `.mia`)
+- Particionar discos con tabla MBR (primarias, extendidas y lógicas)
+- Formatear particiones con EXT2 o EXT3
+- Gestionar usuarios, grupos y permisos POSIX
+- Ejecutar operaciones sobre el sistema de archivos (crear, copiar, mover, eliminar, renombrar, buscar)
+- Simular pérdida y recuperación de datos EXT3 (journaling)
+- Visualizar reportes gráficos (Graphviz) de la estructura interna
+- Acceder a todo lo anterior desde una interfaz web desplegada en AWS
 
 ---
 
 ## Arquitectura del Sistema
 
-### Arquitectura de Capas
-
 ```
-┌─────────────────────────────────┐
-│    Frontend (Next.js/React)     │
-│  - Interfaz de Usuario          │
-│  - Componentes React            │
-│  - Estado Global con Hooks      │
-└─────────────┬───────────────────┘
-              │ HTTP REST API
-┌─────────────▼───────────────────┐
-│  Backend (C++ / HTTP Server)    │
-│  - Procesamiento de Comandos    │
-│  - Lógica de Negocio            │
-│  - Gestión de Discos            │
-└─────────────┬───────────────────┘
-              │
-┌─────────────▼───────────────────┐
-│      Gestor de Montaje          │
-│  - Gestión de Particiones       │
-│  - Puntos de Montaje            │
-└─────────────┬───────────────────┘
-              │
-┌─────────────▼───────────────────┐
-│     Sistema de Archivos EXT2    │
-│  - Lectura/Escritura de Bloques │
-│  - Gestión de Inodos            │
-│  - Tablas de Usuarios/Grupos    │
-└─────────────┬───────────────────┘
-              │
-┌─────────────▼───────────────────┐
-│    Gestor de Discos Físicos     │
-│  - MBR (Master Boot Record)     │
-│  - EBR (Extended Boot Record)   │
-│  - Asignación de Espacio        │
-└─────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│                     USUARIO                          │
+└──────────────────┬───────────────────────────────────┘
+                   │ HTTPS
+┌──────────────────▼───────────────────────────────────┐
+│          Frontend — AWS S3 (sitio web estático)       │
+│  Next.js + TypeScript + Tailwind CSS                  │
+│  http://extreamfs-frontend-849279003367               │
+│       .s3-website-us-east-1.amazonaws.com             │
+└──────────────────┬───────────────────────────────────┘
+                   │ HTTP REST API (puerto 8080)
+┌──────────────────▼───────────────────────────────────┐
+│          Backend — AWS EC2 t3.micro (Ubuntu 22.04)    │
+│  C++ + cpp-httplib                                    │
+│  Elastic IP: 13.218.255.179                           │
+│  Servicio systemd: extreamfs                          │
+└──────────────────┬───────────────────────────────────┘
+                   │ Archivos binarios .mia
+┌──────────────────▼───────────────────────────────────┐
+│      Discos virtuales en el servidor EC2              │
+│  /home/ubuntu/Calificacion_MIA/Discos/                │
+│  Disco1.mia … Disco5.mia (EXT2 / EXT3)               │
+└──────────────────────────────────────────────────────┘
 ```
 
-### Modelo de Datos
+### Componentes del Frontend
 
+| Componente | Archivo | Función |
+|---|---|---|
+| Página principal | `app/page.tsx` | Layout con terminal y explorador |
+| Panel de comandos | `components/CommandPanel.tsx` | Input de comandos, carga de scripts |
+| Explorador de archivos | `components/FileExplorer.tsx` | Navegación disco→partición→carpeta→archivo |
+| Barra de sesión | `components/SessionBar.tsx` | Estado de login, botón iniciar/cerrar sesión |
+| Visor de bloques | `components/BlockViewer.tsx` | Contenido de archivos y journal |
+| Cliente HTTP | `services/api.ts` | Todas las llamadas al backend |
+
+### Componentes del Backend
+
+| Módulo | Ruta | Función |
+|---|---|---|
+| Servidor HTTP | `core/server/server.cpp` | Recibe peticiones, enruta comandos |
+| Comandos | `core/commands/` | ~42 handlers de comandos |
+| Filesystem EXT2/3 | `core/filesystem/` | Lectura/escritura de inodos y bloques |
+| Journaling | `core/filesystem/journal_manager.cpp` | Registro de operaciones EXT3 |
+| Montaje | `core/mount/mount_manager.cpp` | Estado en memoria de particiones montadas |
+| Disco | `core/disk/` | Creación y particionamiento de discos |
+| Reportes | `core/reports/` | Generación de grafos con Graphviz |
+
+---
+
+## Despliegue en AWS
+
+### Infraestructura
+
+| Servicio | Configuración | URL |
+|---|---|---|
+| **EC2** | t3.micro, Ubuntu 22.04, us-east-1 | `13.218.255.179:8080` |
+| **S3** | Sitio web estático, acceso público | [Link del frontend](http://extreamfs-frontend-849279003367.s3-website-us-east-1.amazonaws.com) |
+| **Elastic IP** | `13.218.255.179` — IP fija, no cambia al reiniciar | — |
+
+### Security Groups del EC2
+
+| Puerto | Protocolo | Origen | Propósito |
+|---|---|---|---|
+| 22 | TCP | 0.0.0.0/0 | SSH para administración |
+| 8080 | TCP | 0.0.0.0/0 | API REST del backend |
+
+### Proceso de despliegue
+
+**Backend (EC2):**
+```bash
+# Compilar localmente
+cd frontend/backend && cmake -B build && cd build && make -j$(nproc)
+
+# Copiar al servidor
+scp -i ~/.ssh/extreamfs-key.pem extreamfs ubuntu@13.218.255.179:~/extreamfs/
+
+# Reiniciar servicio
+ssh -i ~/.ssh/extreamfs-key.pem ubuntu@13.218.255.179 "sudo systemctl restart extreamfs"
 ```
-Disco (disco.dsk)
-│
-├── MBR (512 bytes)
-│   ├── Tabla de Particiones (4 primarias)
-│   └── Firma (0xAA55)
-│
-├── Partición Primaria/Lógica
-│   ├── SuperBloque EXT2
-│   ├── Tabla de Inodos
-│   ├── Mapa de Bits (Bloques)
-│   ├── Mapa de Bits (Inodos)
-│   ├── Bloques de Datos
-│   └── Tabla de Usuarios/Grupos
-│
-└── EBR (para particiones extendidas)
+
+**Frontend (S3):**
+```bash
+cd frontend
+npm run build
+aws s3 sync out/ s3://extreamfs-frontend-849279003367/ --delete --region us-east-1
+```
+
+### Servicio systemd del backend
+
+```ini
+[Unit]
+Description=ExtreamFS Backend
+After=network.target
+
+[Service]
+ExecStart=/home/ubuntu/extreamfs/extreamfs
+WorkingDirectory=/home/ubuntu/extreamfs
+Restart=always
+User=ubuntu
+
+[Install]
+WantedBy=multi-user.target
 ```
 
 ---
@@ -98,117 +152,59 @@ Disco (disco.dsk)
 ## Estructura de Carpetas
 
 ```
-MIA_1S2026_P1_202101149/
-├── frontend/                          # Aplicación completa
-│   ├── backend/                       # Backend C++
-│   │   ├── core/                      # Lógica principal
-│   │   │   ├── commands/              # Implementación de comandos
-│   │   │   │   ├── mkdisk.{h,cpp}    # Crear disco
-│   │   │   │   ├── fdisk.{h,cpp}     # Particionar disco
-│   │   │   │   ├── mkfs.{h,cpp}      # Crear sistema de archivos
-│   │   │   │   ├── mount.{h,cpp}     # Montar partición
-│   │   │   │   ├── mkdir_cmd.{h,cpp} # Crear directorio
-│   │   │   │   ├── mkfile_cmd.{h,cpp}# Crear archivo
-│   │   │   │   ├── cat_cmd.{h,cpp}   # Leer archivo
-│   │   │   │   ├── mkusr.{h,cpp}     # Crear usuario
-│   │   │   │   ├── mkgrp.{h,cpp}     # Crear grupo
-│   │   │   │   ├── chgrp.{h,cpp}     # Cambiar grupo
-│   │   │   │   ├── rmusr.{h,cpp}     # Eliminar usuario
-│   │   │   │   ├── rmgrp.{h,cpp}     # Eliminar grupo
-│   │   │   │   ├── rmdisk.{h,cpp}    # Eliminar disco
-│   │   │   │   └── rep_cmd.{h,cpp}   # Generar reportes
-│   │   │   │
-│   │   │   ├── disk/                 # Gestión de discos
-│   │   │   │   ├── disk_creator.cpp  # Crear archivos de disco
-│   │   │   │   ├── mbr.h             # Estructura MBR
-│   │   │   │   └── ebr.h             # Estructura EBR
-│   │   │   │
-│   │   │   ├── filesystem/           # Sistema de archivos
-│   │   │   │   ├── ext2_reader.{h,cpp}    # Lectura de EXT2
-│   │   │   │   ├── ext2_writer.{h,cpp}    # Escritura de EXT2
-│   │   │   │   ├── SuperBlock.{h,cpp}     # Superbloque
-│   │   │   │   ├── Inode.h                # Estructura de Inode
-│   │   │   │   ├── Blocks.h               # Estructuras de Bloques
-│   │   │   │   ├── login.{h,cpp}         # Autenticación
-│   │   │   │   ├── logout.{h,cpp}        # Cierre de sesión
-│   │   │   │   ├── session_manager.{h,cpp} # Gestión de sesiones
-│   │   │   │   ├── permissions.h         # Sistema de permisos
-│   │   │   │   ├── users_manager.h       # Gestión de usuarios
-│   │   │   │   └── EXT2Utils.h           # Utilidades EXT2
-│   │   │   │
-│   │   │   ├── mount/                # Gestión de montaje
-│   │   │   │   └── mount_manager.{h,cpp}
-│   │   │   │
-│   │   │   ├── reports/             # Generadores de reportes
-│   │   │   │   ├── report_mbr.{h,cpp}
-│   │   │   │   ├── report_sb.{h,cpp}
-│   │   │   │   ├── report_bm.{h,cpp}
-│   │   │   │   ├── report_inode.{h,cpp}
-│   │   │   │   ├── report_block.{h,cpp}
-│   │   │   │   ├── report_disk.{h,cpp}
-│   │   │   │   ├── report_ls.{h,cpp}
-│   │   │   │   ├── report_tree.{h,cpp}
-│   │   │   │   ├── report_file.{h,cpp}
-│   │   │   │   └── report_utils.h
-│   │   │   │
-│   │   │   ├── server/              # Servidor HTTP
-│   │   │   │   └── server.{h,cpp}
-│   │   │   │
-│   │   │   └── utils/               # Utilidades generales
-│   │   │
-│   │   ├── include/                 # Headers de terceros
-│   │   │   ├── httplib.h            # Librería HTTP
-│   │   │   └── main.cpp             # Punto de entrada
-│   │   │
-│   │   ├── build/                   # Directorio de compilación
-│   │   │   ├── extreamfs            # Ejecutable (Modo consola)
-│   │   │   └── extreamfs_debug      # Ejecutable (Debug)
-│   │   │
-│   │   └── CMakeLists.txt           # Configuración CMake
-│   │
-│   ├── components/                  # Componentes React
-│   │   ├── CommandPanel.tsx         # Panel de entrada de comandos
-│   │   ├── Terminal.tsx             # Terminal interactiva
-│   │   ├── TerminalInput.tsx        # Input de terminal
-│   │   ├── TerminalOutput.tsx       # Output de terminal
-│   │   ├── FileExplorer.tsx         # Explorador de archivos
-│   │   └── BlockViewer.tsx          # Visor de bloques
-│   │
-│   ├── app/                         # Aplicación Next.js
-│   │   ├── page.tsx                 # Página principal
-│   │   ├── layout.tsx               # Layout global
-│   │   └── globals.css              # Estilos globales
-│   │
-│   ├── services/                    # Servicios
-│   │   └── api.ts                   # Cliente HTTP para backend
-│   │
-│   ├── types/                       # Tipos TypeScript
-│   │   └── filesystem.ts            # Tipos del sistema de archivos
-│   │
-│   ├── hooks/                       # React Hooks
-│   │   └── useFilesystem.ts         # Hook para gestión de FS
-│   │
-│   ├── package.json                 # Dependencias Node.js
-│   ├── tsconfig.json                # Configuración TypeScript
-│   ├── next.config.ts               # Configuración Next.js
-│   ├── postcss.config.mjs           # Configuración PostCSS
-│   └── eslint.config.mjs            # Configuración ESLint
-│
-├── Documentacion/                    # Documentación
-│   └── images/                      # Imágenes y reportes
-│       ├── CONSOLAS.png
-│       ├── INTERFAZ.png
-│       ├── disco1_block.jpg
-│       ├── disco1_inode.jpg
-│       ├── disco1_ls_docs.jpg
-│       ├── disco1_mbr.jpg
-│       ├── disco1_sb.jpg
-│       └── disco1_tree.jpg
-│
-├── USER_GUIDE.md                    # Manual de usuario
-├── TECHNICAL_GUIDE.md               # Manual técnico
-├── README.md                        # Descripción del proyecto
-└── test.smia                        # Archivo de prueba
+MIA_1S2026_P2_202101149/
+├── frontend/
+│   ├── backend/                        # Backend C++
+│   │   ├── CMakeLists.txt
+│   │   └── core/
+│   │       ├── commands/               # Handlers de comandos
+│   │       │   ├── mkdisk.cpp/h        # Crear disco
+│   │       │   ├── rmdisk.cpp/h        # Eliminar disco
+│   │       │   ├── fdisk.cpp/h         # Particionar (create/delete/add)
+│   │       │   ├── mount.cpp/h         # Montar partición
+│   │       │   ├── unmount_cmd.cpp/h   # Desmontar partición
+│   │       │   ├── mkfs.cpp/h          # Formatear EXT2/EXT3
+│   │       │   ├── mkdir_cmd.cpp/h     # Crear directorio
+│   │       │   ├── mkfile_cmd.cpp/h    # Crear archivo
+│   │       │   ├── cat_cmd.cpp/h       # Leer archivo(s)
+│   │       │   ├── rename_cmd.cpp/h    # Renombrar
+│   │       │   ├── copy_cmd.cpp/h      # Copiar archivo/dir
+│   │       │   ├── move_cmd.cpp/h      # Mover archivo/dir
+│   │       │   ├── remove_cmd.cpp/h    # Eliminar archivo/dir
+│   │       │   ├── find_cmd.cpp/h      # Buscar por nombre
+│   │       │   ├── chmod_cmd.cpp/h     # Cambiar permisos
+│   │       │   ├── chown_cmd.cpp/h     # Cambiar propietario
+│   │       │   ├── journaling_cmd.cpp/h# Ver journal EXT3
+│   │       │   ├── loss_cmd.cpp/h      # Simular pérdida EXT3
+│   │       │   ├── mkusr.cpp/h         # Crear usuario
+│   │       │   ├── rmusr.cpp/h         # Eliminar usuario
+│   │       │   ├── mkgrp.cpp/h         # Crear grupo
+│   │       │   ├── rmgrp.cpp/h         # Eliminar grupo
+│   │       │   └── chgrp.cpp/h         # Cambiar grupo de usuario
+│   │       ├── filesystem/             # EXT2/EXT3 internals
+│   │       │   ├── ext2_reader.cpp/h
+│   │       │   ├── ext2_writer.cpp/h
+│   │       │   ├── SuperBlock.h
+│   │       │   ├── Inode.h
+│   │       │   ├── Blocks.h
+│   │       │   ├── journal_manager.cpp/h
+│   │       │   ├── session_manager.cpp/h
+│   │       │   └── permissions.h
+│   │       ├── disk/                   # MBR / EBR
+│   │       ├── mount/                  # Mount manager
+│   │       ├── reports/                # Graphviz report generators
+│   │       └── server/                 # cpp-httplib HTTP server
+│   ├── app/                            # Next.js App Router
+│   ├── components/                     # React components
+│   ├── services/api.ts                 # HTTP client
+│   ├── .env.production                 # NEXT_PUBLIC_API_URL
+│   └── .env.development.local          # localhost:8080
+├── Documentacion/
+│   ├── TECHNICAL_GUIDE.md              # Este documento
+│   ├── USER_GUIDE.md                   # Manual de usuario
+│   ├── AWS_GUIA_RAPIDA.md              # Referencia de operaciones AWS
+│   └── GUIA_DE_PRUEBAS.md             # Checklist de pruebas
+└── Archivo_De_Prueba_P2.smia           # Script de pruebas (221 comandos)
 ```
 
 ---
@@ -216,888 +212,390 @@ MIA_1S2026_P1_202101149/
 ## Tecnologías Utilizadas
 
 ### Backend
-| Tecnología | Versión | Propósito |
-|-----------|---------|----------|
-| C++ | C++11/14 | Lenguaje principal |
-| CMake | 3.22+ | Sistema de compilación |
-| cpp-httplib | 0.11+ | Servidor HTTP |
-| STL | Estándar | Estructuras de datos |
+| Tecnología | Propósito |
+|---|---|
+| C++17 | Lenguaje principal |
+| CMake 3.22+ | Sistema de compilación |
+| cpp-httplib | Servidor HTTP embebido |
+| Graphviz (`dot`) | Generación de reportes gráficos |
 
 ### Frontend
-| Tecnología | Versión | Propósito |
-|-----------|---------|----------|
-| Next.js | 14+ | Framework web |
-| React | 18+ | Librería UI |
-| TypeScript | 5+ | Tipado de JavaScript |
-| Tailwind CSS | 3+ | Framework CSS |
-| Node.js | 16+ | Runtime JavaScript |
+| Tecnología | Propósito |
+|---|---|
+| Next.js 15 | Framework React (App Router) |
+| TypeScript | Tipado estático |
+| Tailwind CSS 4 | Estilos |
 
-### Herramientas
-| Herramienta | Propósito |
-|-----------|----------|
-| CMake | Compilación C++ |
-| npm | Gestor de paquetes |
-| Git | Control de versiones |
-| GCC/Clang | Compiladores C++ |
+### Infraestructura
+| Servicio | Propósito |
+|---|---|
+| AWS EC2 t3.micro | Servidor backend C++ (Ubuntu 22.04) |
+| AWS S3 | Hosting del frontend estático |
+| AWS Elastic IP | IP fija para el backend |
+| systemd | Auto-restart del servicio backend |
 
 ---
 
 ## Estructuras de Datos
 
-### 1. Master Boot Record (MBR)
+### MBR (Master Boot Record)
 
 ```cpp
-struct Partition {
-    char status;              // 0x00 o 0x80 (inactiva/activa)
-    char first_head;          // CHS de inicio
-    char first_sector;
-    char first_cylinder;
-    char id;                  // Tipo de partición
-    char last_head;           // CHS de fin
-    char last_sector;
-    char last_cylinder;
-    int start;                // LBA de inicio
-    int size;                 // Tamaño de la partición
+struct MBR {
+    long mbr_size;               // Tamaño total del disco en bytes
+    char mbr_fecha[19];          // Fecha de creación
+    char mbr_fit;                // Algoritmo de ajuste: B/F/W
+    Partition mbr_partitions[4]; // Tabla de 4 particiones
 };
 
-struct MBR {
-    char padding[446];        // Código de arranque
-    Partition particiones[4]; // Tabla de particiones (4 entradas)
-    char firma[2];            // 0xAA 0x55 (firma del MBR)
+struct Partition {
+    char part_status;   // '0'=inactiva, '1'=activa
+    char part_type;     // 'P'=primaria, 'E'=extendida, 'L'=lógica
+    char part_fit;      // 'B'=BestFit, 'F'=FirstFit, 'W'=WorstFit
+    long part_start;    // Offset en bytes desde inicio del disco
+    long part_size;     // Tamaño en bytes
+    char part_name[16]; // Nombre de la partición
+    char part_correlative[4]; // Correlativo para ID de montaje
+    char part_id[4];    // ID asignado al montar (ej: 491A)
 };
 ```
 
-### 2. Extended Boot Record (EBR)
+### EBR (Extended Boot Record)
 
 ```cpp
 struct EBR {
-    char nothing[446];
-    Partition partition;      // Partición lógica actual
-    Partition extended;       // Referencia a siguiente EBR
-    char nothing2[60];
-    char firma[2];            // Firma 0xAA 0x55
+    char part_mount;    // '0' no montada, '1' montada
+    char part_fit;
+    long part_start;
+    long part_size;
+    long part_next;     // Offset del siguiente EBR (-1 si es el último)
+    char part_name[16];
 };
 ```
 
-### 3. SuperBloque EXT2
+### SuperBloque EXT2/EXT3
 
 ```cpp
 struct SuperBlock {
-    unsigned int total_inodes;         // Total de inodos
-    unsigned int total_blocks;         // Total de bloques
-    unsigned int reserved_blocks;      // Bloques reservados
-    unsigned int free_blocks;          // Bloques libres
-    unsigned int free_inodes;          // Inodos libres
-    unsigned int block_size;           // Tamaño de bloque
-    unsigned int inode_size;           // Tamaño de inodo
-    unsigned int blocks_per_group;     // Bloques por grupo
-    unsigned int inodes_per_group;     // Inodos por grupo
-    unsigned int creation_time;        // Tiempo de creación
-    unsigned int last_write_time;      // Último acceso
-    unsigned int fsck_count;           // Contador FSCK
-    unsigned int max_mount_count;      // Montajes máximos
-    char uuid[16];                     // Identificador único
-    char volume_name[16];              // Nombre de volumen
+    int  s_filesystem_type;   // 2=EXT2, 3=EXT3
+    int  s_inodes_count;      // Total de inodos
+    int  s_blocks_count;      // Total de bloques
+    int  s_free_blocks_count;
+    int  s_free_inodes_count;
+    int  s_mtime;             // Última montada
+    int  s_umtime;            // Última desmontada
+    int  s_mnt_count;         // Veces montada
+    int  s_magic;             // 0xEF53
+    int  s_inode_size;        // sizeof(Inode)
+    int  s_block_size;        // sizeof(DirectoryBlock/etc)
+    int  s_first_ino;         // Primer inodo disponible
+    long s_first_blo;         // Primer bloque disponible
+    long s_bm_inode_start;    // Inicio bitmap de inodos
+    long s_bm_block_start;    // Inicio bitmap de bloques
+    long s_inode_start;       // Inicio tabla de inodos
+    long s_block_start;       // Inicio área de bloques
 };
 ```
 
-### 4. Inode EXT2
+### Inodo
 
 ```cpp
 struct Inode {
-    unsigned short mode;               // Tipo y permisos
-    unsigned short uid;                // ID de propietario
-    unsigned int size;                 // Tamaño del archivo
-    unsigned int access_time;          // Tiempo de acceso
-    unsigned int creation_time;        // Tiempo de creación
-    unsigned int modification_time;    // Tiempo de modificación
-    unsigned int deletion_time;        // Tiempo de eliminación
-    unsigned short gid;                // ID de grupo
-    unsigned short link_count;         // Número de enlaces
-    unsigned int disk_sectors;         // Sectores en disco
-    unsigned int flags;                // Banderas
-    unsigned int os_specific_1;        // OS específico
-    unsigned int block_pointers[15];   // Punteros a bloques
-    unsigned int generation_number;    // Número de generación
-    unsigned int file_acl;             // ACL de archivo
-    unsigned int dir_acl_or_size_high; // ACL de directorio
-    unsigned int fragment_block_addr;  // Dirección de bloque
-    unsigned char os_specific_2[12];   // OS específico
+    int  i_uid;          // UID del propietario
+    int  i_gid;          // GID del grupo
+    int  i_size;         // Tamaño en bytes
+    char i_atime[19];    // Último acceso
+    char i_ctime[19];    // Creación
+    char i_mtime[19];    // Última modificación
+    int  i_block[15];    // Punteros a bloques (12 directos + 3 indirectos)
+    char i_type;         // '0'=carpeta, '1'=archivo
+    int  i_perm;         // Permisos (ej: 664, 755)
 };
 ```
 
-### 5. Entrada de Directorio
+### Bloques
 
 ```cpp
-struct Content {
-    unsigned int inode_number;         // Número de inode
-    unsigned short total_size;         // Tamaño total de entrada
-    unsigned char name_length;         // Longitud del nombre
-    unsigned char type_indicator;      // Tipo de entrada
-    char name[256];                    // Nombre del archivo
-};
-```
-
-### 6. Bloque de Directorio
-
-```cpp
+// Bloque de directorio
 struct DirectoryBlock {
-    Content contents[1024];            // Entradas de directorio
+    DirectoryContent b_content[4]; // 4 entradas por bloque
 };
-```
 
-### 7. Bloque de Archivo
+struct DirectoryContent {
+    int  b_inodo;    // Número de inodo (-1=vacío)
+    char b_name[12]; // Nombre del archivo/carpeta
+};
 
-```cpp
+// Bloque de archivo (contenido)
 struct FileBlock {
-    char data[4096];                   // Datos del archivo
+    char b_content[64]; // 64 bytes de contenido
+};
+
+// Bloque de punteros (indirecto)
+struct PointerBlock {
+    int b_pointers[16]; // 16 punteros a bloques
 };
 ```
 
-### 8. Entrada de Usuario
+---
+
+## Sistema de Archivos EXT2
+
+### Layout en disco
+
+```
+[part_start]
+├── SuperBloque         (sizeof SuperBlock bytes)
+├── Bitmap de Inodos    (s_inodes_count bytes, 1 bit por inodo)
+├── Bitmap de Bloques   (s_blocks_count bytes, 1 bit por bloque)
+├── Tabla de Inodos     (s_inodes_count × sizeof Inode bytes)
+└── Área de Bloques     (s_blocks_count × 64 bytes)
+    ├── Bloque 0: raíz '/' (DirectoryBlock)
+    └── Bloques 1..N: datos
+```
+
+### Número de estructuras
+
+```
+tamaño_particion = sizeof(SuperBlock)
+                 + n × sizeof(Inode)
+                 + n              (bitmap inodos)
+                 + 3×n × 64      (bloques: dir + archivo + contenido)
+                 + 3×n           (bitmap bloques)
+
+n = floor(resultado de despejar n)
+```
+
+### Inodo raíz
+
+Al formatear con `mkfs`, se crean automáticamente:
+- Inodo 0 → directorio raíz `/`
+- Inodo 1 → archivo `/users.txt` (usuarios y grupos del sistema)
+
+### ID de montaje
+
+El ID sigue el formato `{contador}{disco_letra}{partición_correlativo}`:
+- `4` = número de disco (49 = número de disco en el sistema)
+- `91A` = primer disco letra A, partición 1
+
+Ejemplo: `491A` = primera partición montada del primer disco del sistema 49.
+
+---
+
+## Sistema de Archivos EXT3 y Journaling
+
+### Diferencia con EXT2
+
+EXT3 agrega un área de **journaling** entre el SuperBloque y el Bitmap de Inodos:
+
+```
+[part_start]
+├── SuperBloque
+├── Área de Journaling  (50 × sizeof(Journal) bytes)   ← NUEVO en EXT3
+├── Bitmap de Inodos
+├── Bitmap de Bloques
+├── Tabla de Inodos
+└── Área de Bloques
+```
+
+### Estructura Journal
 
 ```cpp
-struct UserEntry {
-    int user_id;                       // ID único del usuario
-    char username[50];                 // Nombre de usuario
-    char password[256];                // Hash de contraseña
-    unsigned int creation_date;        // Fecha de creación
-    char description[150];             // Descripción
+struct Journal {
+    int j_count;           // Número de la entrada (-1 = vacía)
+    Information j_content; // Contenido de la operación
+};
+
+struct Information {
+    char i_operation[10]; // Operación: mkdir, mkfile, rename, copy, move, remove, chmod, chown
+    char i_path[32];      // Ruta afectada
+    char i_content[64];   // Contenido adicional (nombre nuevo, usuario, permisos, etc.)
+    char i_date[19];      // Fecha y hora de la operación
 };
 ```
 
-### 9. Entrada de Grupo
+### Operaciones que generan entrada en el journal
 
-```cpp
-struct GroupEntry {
-    int group_id;                      // ID único del grupo
-    char group_name[50];               // Nombre del grupo
-    unsigned int creation_date;        // Fecha de creación
-    char description[150];             // Descripción
-};
-```
+| Operación | i_operation | i_path | i_content |
+|---|---|---|---|
+| `mkdir` | `"mkdir"` | ruta del directorio | — |
+| `mkfile` | `"mkfile"` | ruta del archivo | — |
+| `rename` | `"rename"` | ruta original | nuevo nombre |
+| `copy` | `"copy"` | ruta origen | destino |
+| `move` | `"move"` | ruta origen | destino |
+| `remove` | `"remove"` | ruta eliminada | — |
+| `chmod` | `"chmod"` | ruta del archivo | nuevo permiso (ej: "755") |
+| `chown` | `"chown"` | ruta del archivo | nuevo usuario |
+
+### Comando `loss` — Simulación de pérdida
+
+El comando `loss -id=491B` simula una pérdida del sistema de archivos EXT3 borrando el área de journaling (sobreescribiendo con zeros). Después del `loss`, el journal queda vacío y el sistema puede continuar operando (simulación de recuperación).
 
 ---
 
 ## Comandos Implementados
 
-### 1. mkdisk - Crear Disco
-```
-Sintaxis: mkdisk -size=<número> -unit=<K|M|G> -fit=<FF|BF|WF> -path=<ruta>
+### Gestión de discos
 
-Función:
-- Crea un archivo de disco virtual con tamaño especificado
-- Inicializa el MBR en el sector 0
-- Asigna espacio en disco según fitSize
+| Comando | Parámetros obligatorios | Parámetros opcionales | Descripción |
+|---|---|---|---|
+| `mkdisk` | `-size=N -path=ruta` | `-unit=B/K/M -fit=BF/FF/WF` | Crea un disco virtual `.mia` |
+| `rmdisk` | `-path=ruta` | — | Elimina el archivo de disco |
 
-Parámetros:
-- size: Tamaño del disco (entero)
-- unit: K=Kilobytes, M=Megabytes, G=Gigabytes
-- fit: FF=First Fit, BF=Best Fit, WF=Worst Fit
-- path: Ruta completa del archivo a crear
-```
+### Particionamiento
 
-### 2. fdisk - Particionar Disco
-```
-Sintaxis: fdisk -size=<número> -unit=<K|M|G> -type=<P|E|L> -fit=<FF|BF|WF> 
-              -delete=<0|1> -name=<nombre> -path=<ruta>
+| Comando | Parámetros | Descripción |
+|---|---|---|
+| `fdisk` (crear) | `-name=X -size=N -path=ruta` | `-type=P/E/L -unit=B/K/M -fit=BF/FF/WF` | Crea partición |
+| `fdisk` (eliminar) | `-delete=fast/full -name=X -path=ruta` | — | `fast`: marca vacía, `full`: rellena con \0 |
+| `fdisk` (resize) | `-add=N -name=X -path=ruta` | `-unit=B/K/M` | N positivo = ampliar, N negativo = reducir |
+| `mount` | `-path=ruta -name=X` | — | Monta una partición primaria |
+| `unmount` | `-id=ID` | — | Desmonta por ID |
+| `mounted` | — | — | Lista todas las particiones montadas |
 
-Función:
-- Crea o elimina particiones en el disco
-- Soporta particiones primarias, extendidas y lógicas
-- Maneja MBR y EBR automáticamente
+### Formateo
 
-Parámetros:
-- size: Tamaño de la partición
-- type: P=Primaria, E=Extendida, L=Lógica
-- delete: 0=crear, 1=eliminar
-- name: Identificador de partición
-- fit: Estrategia de asignación
-```
+| Comando | Parámetros obligatorios | Parámetros opcionales | Descripción |
+|---|---|---|---|
+| `mkfs` | `-id=ID` | `-type=full -fs=2fs/3fs` | Formatea como EXT2 (default) o EXT3 |
 
-### 3. mkfs - Crear Sistema de Archivos
-```
-Sintaxis: mkfs -type=<ext2> -fs=<ext2> -id=<partition_id> -path=<ruta>
+### Sesión
 
-Función:
-- Formatea una partición con EXT2
-- Crea SuperBloque, inodos, y mapas de bits
-- Inicializa tabla de usuarios (root)
+| Comando | Parámetros | Descripción |
+|---|---|---|
+| `login` | `-user=X -pass=X -id=ID` | Inicia sesión en una partición |
+| `logout` | — | Cierra la sesión activa |
 
-Parámetros:
-- type: Tipo de formato (ext2)
-- fs: Sistema de archivos (ext2)
-- id: ID de partición a formatear
-- path: Ruta del disco
-```
+### Usuarios y grupos
 
-### 4. mount - Montar Partición
-```
-Sintaxis: mount -path=<ruta> -name=<nombre>
+| Comando | Parámetros | Descripción |
+|---|---|---|
+| `mkgrp` | `-name=X` | Crea un grupo (solo root) |
+| `rmgrp` | `-name=X` | Elimina un grupo (solo root) |
+| `mkusr` | `-user=X -pass=X -grp=X` | Crea un usuario (solo root) |
+| `rmusr` | `-user=X` | Elimina un usuario (solo root) |
+| `chgrp` | `-user=X -grp=X` | Cambia el grupo de un usuario (solo root) |
 
-Función:
-- Registra una partición como montada
-- Habilita operaciones de lectura/escritura
-- Mantiene tabla de particiones montadas
+### Operaciones de archivos
 
-Parámetros:
-- path: Ruta del disco
-- name: Nombre de punto de montaje
-```
+| Comando | Parámetros obligatorios | Parámetros opcionales | Descripción |
+|---|---|---|---|
+| `mkdir` | `-path=ruta` | `-p` (crea padres), `-r` (recursivo) | Crea directorio |
+| `mkfile` | `-path=ruta` | `-size=N -cont=ruta -r` | Crea archivo con contenido opcional |
+| `cat` | `-file1=ruta` | `-file2=ruta -file3=ruta` | Lee y concatena hasta 3 archivos |
+| `rename` | `-path=ruta -name=nuevo` | — | Renombra archivo o carpeta |
+| `copy` | `-path=ruta -destino=ruta` | — | Copia archivo o directorio completo |
+| `move` | `-path=ruta -destino=ruta` | — | Mueve archivo o directorio completo |
+| `remove` | `-path=ruta` | — | Elimina archivo o directorio recursivamente |
+| `find` | `-path=ruta -name=patron` | — | Busca por nombre (soporta `*` y `?`) |
 
-### 5. mkdir - Crear Directorio
-```
-Sintaxis: mkdir -name=<ruta> -path=<disco>
+### Permisos
 
-Función:
-- Crea un nuevo directorio en el sistema de archivos
-- Asigna inode y bloque de directorio
-- Actualiza directorio padre
+| Comando | Parámetros obligatorios | Parámetros opcionales | Descripción |
+|---|---|---|---|
+| `chmod` | `-path=ruta -ugo=NNN` | `-r` (recursivo) | Cambia permisos (0–7 por dígito) |
+| `chown` | `-path=ruta -usuario=X` | `-r` (recursivo) | Cambia propietario |
 
-Parámetros:
-- name: Ruta del nuevo directorio
-- path: Archivo de disco
-```
+### EXT3
 
-### 6. mkfile - Crear Archivo
-```
-Sintaxis: mkfile -name=<ruta> -size=<bytes> -path=<disco>
+| Comando | Parámetros | Descripción |
+|---|---|---|
+| `journaling` | `-id=ID` | Muestra las entradas del journal de la partición |
+| `loss` | `-id=ID` | Simula pérdida del sistema de archivos EXT3 |
 
-Función:
-- Crea un nuevo archivo regular
-- Asigna inode y bloques de datos
-- Inicializa permiso rwxr-xr-x
+### Reportes
 
-Parámetros:
-- name: Ruta del nuevo archivo
-- size: Tamaño en bytes
-- path: Archivo de disco
-```
+| Comando | `-name=` | Salida | Descripción |
+|---|---|---|---|
+| `rep` | `mbr` | `.jpg` | Estructura del MBR |
+| `rep` | `disk` | `.jpg` | Layout del disco con particiones |
+| `rep` | `inode` | `.jpg` | Tabla de inodos |
+| `rep` | `block` | `.jpg` | Bloques de datos |
+| `rep` | `bm_inode` | `.txt` | Bitmap de inodos |
+| `rep` | `bm_block` | `.txt` | Bitmap de bloques |
+| `rep` | `sb` | `.jpg` | Superbloque |
+| `rep` | `file` | `.txt` | Bloques de un archivo específico (`-path_file_ls=`) |
+| `rep` | `ls` | `.jpg` | Listado de directorio con permisos (`-path_file_ls=`) |
+| `rep` | `tree` | `.png` | Árbol completo del filesystem |
 
-### 7. cat - Leer Archivo
-```
-Sintaxis: cat -path=<disco> -file=<ruta>
-
-Función:
-- Lee contenido de archivo
-- Muestra en consola o archivo
-- Verifica permisos de lectura
-
-Parámetros:
-- path: Archivo de disco
-- file: Ruta del archivo a leer
-```
-
-### 8. login - Autenticación
-```
-Sintaxis: login -user=<usuario> -pass=<contraseña> -id=<partition_id>
-
-Función:
-- Valida credenciales de usuario
-- Inicia sesión en partición
-- Almacena contexto de usuario actual
-
-Parámetros:
-- user: Nombre de usuario
-- pass: Contraseña
-- id: ID de partición
-```
-
-### 9. logout - Cerrar Sesión
-```
-Sintaxis: logout
-
-Función:
-- Cierra sesión actual
-- Limpia contexto de usuario
-- Desmonta sistema de archivos lógicamente
-```
-
-### 10. mkusr - Crear Usuario
-```
-Sintaxis: mkusr -user=<nombre> -pass=<contraseña> -id=<partition_id>
-
-Función:
-- Crea nuevas entradas de usuario
-- Asigna UID automático
-- Almacena hash de contraseña
-
-Parámetros:
-- user: Nombre de usuario
-- pass: Contraseña
-- id: Partición donde crear usuario
-```
-
-### 11. mkgrp - Crear Grupo
-```
-Sintaxis: mkgrp -name=<nombre> -id=<partition_id>
-
-Función:
-- Crea nuevas entradas de grupo
-- Asigna GID automático
-- Registra grupo en tabla de usuarios
-
-Parámetros:
-- name: Nombre del grupo
-- id: Partición donde crear grupo
-```
-
-### 12. chgrp - Cambiar Grupo de Usuario
-```
-Sintaxis: chgrp -user=<usuario> -group=<grupo> -id=<partition_id>
-
-Función:
-- Asigna usuario a grupo
-- Actualiza tabla de usuarios
-- Sincroniza cambios en disco
-
-Parámetros:
-- user: Nombre de usuario
-- group: Nombre de grupo
-- id: Partición
-```
-
-### 13. rmusr - Eliminar Usuario
-```
-Sintaxis: rmusr -user=<usuario> -id=<partition_id>
-
-Función:
-- Elimina entrada de usuario
-- Reasigna archivos a root
-- Actualiza tabla de usuarios
-
-Parámetros:
-- user: Usuario a eliminar
-- id: Partición
-```
-
-### 14. rmgrp - Eliminar Grupo
-```
-Sintaxis: rmgrp -name=<nombre> -id=<partition_id>
-
-Función:
-- Elimina entrada de grupo
-- Desasigna usuarios del grupo
-- Limpia referencias
-
-Parámetros:
-- name: Nombre de grupo
-- id: Partición
-```
-
-### 15. rmdisk - Eliminar Disco
-```
-Sintaxis: rmdisk -path=<ruta>
-
-Función:
-- Elimina archivo de disco
-- Desmonta particiones
-- Limpia tabla de montaje
-
-Parámetros:
-- path: Ruta del archivo de disco
-```
-
-### 16. rep - Generar Reportes
-```
-Sintaxis: rep -name=<tipo> -path=<disco> -id=<partition_id>
-
-Tipos de reportes:
-- mbr: Tabla de particiones del MBR
-- sb: Información del SuperBloque
-- bm: Mapa de bits de bloques
-- bit: Mapa de bits de inodos
-- disk: Información general del disco
-- tree: Árbol de directorios
-- ls: Listado de archivos
-- file: Información de archivo específico
-
-Función:
-- Genera reportes en formato GraphViz
-- Visualiza estructura interna
-- Exporta a PNG o JPG
-```
+Parámetros del comando `rep`: `-id=ID -path=salida -name=tipo [-path_file_ls=ruta]`
 
 ---
 
-## Diagramas de Clase
+## API REST del Backend
 
-### Arquitectura de Clases del Sistema
-
-```
-┌──────────────────────────────────┐
-│       MountManager               │
-├──────────────────────────────────┤
-│ - mountedPartitions[]            │
-│ - activeSession                  │
-├──────────────────────────────────┤
-│ + mount()                        │
-│ + unmount()                      │
-│ + getActiveMountPoint()          │
-└────────────┬─────────────────────┘
-             │ usa
-             ▼
-┌──────────────────────────────────┐
-│      EXT2Reader/Writer           │
-├──────────────────────────────────┤
-│ - diskFile                       │
-│ - superBlock                     │
-│ - inodeTable[]                   │
-├──────────────────────────────────┤
-│ + readInode()                    │
-│ + writeInode()                   │
-│ + readBlock()                    │
-│ + writeBlock()                   │
-│ + findFreeInode()               │
-│ + findFreeBlock()               │
-└────────────┬─────────────────────┘
-             │ usa
-             ▼
-┌──────────────────────────────────┐
-│        DiskCreator               │
-├──────────────────────────────────┤
-│ - diskPath                       │
-│ - diskSize                       │
-├──────────────────────────────────┤
-│ + createDisk()                   │
-│ + writeMBR()                     │
-│ + writeEBR()                     │
-└──────────────────────────────────┘
-
-┌──────────────────────────────────┐
-│         Login/Logout             │
-├──────────────────────────────────┤
-│ - currentUser                    │
-│ - currentGroup                   │
-├──────────────────────────────────┤
-│ + authenticate()                 │
-│ + logout()                       │
-│ + getCurrentUser()               │
-└──────────────────────────────────┘
-
-┌──────────────────────────────────┐
-│      SessionManager              │
-├──────────────────────────────────┤
-│ - sessions[]                     │
-│ - activeUserID                   │
-├──────────────────────────────────┤
-│ + createSession()                │
-│ + getSession()                   │
-│ + validateSession()              │
-└──────────────────────────────────┘
-
-┌──────────────────────────────────┐
-│       Permissions                │
-├──────────────────────────────────┤
-│ - mode: unsigned short            │
-├──────────────────────────────────┤
-│ + hasPermission()                │
-│ + setPermission()                │
-│ + checkOwnership()               │
-└──────────────────────────────────┘
-```
-
-### Clases de Comandos
-
-```
-Comando Base (Interfaz)
-    │
-    ├─────────────────────────────────┬──────────────────────┐
-    │                                  │                       │
-    
-┌────────────────┐  ┌───────────────┐  ┌──────────────────┐
-│   MkDisk       │  │   FDisk       │  │    Mkfs          │
-├────────────────┤  ├───────────────┤  ├──────────────────┤
-│ + execute()    │  │ + execute()   │  │ + execute()      │
-│ + validate()   │  │ + validate()  │  │ + validate()     │
-└────────────────┘  └───────────────┘  └──────────────────┘
-
-┌────────────────┐  ┌───────────────┐  ┌──────────────────┐
-│   MkFile       │  │   MkDir       │  │    Cat           │
-├────────────────┤  ├───────────────┤  ├──────────────────┤
-│ + execute()    │  │ + execute()   │  │ + execute()      │
-│ + validate()   │  │ + validate()  │  │ + validate()     │
-└────────────────┘  └───────────────┘  └──────────────────┘
-
-┌────────────────┐  ┌───────────────┐  ┌──────────────────┐
-│   MkUsr        │  │   MkGrp       │  │    ChGrp         │
-├────────────────┤  ├───────────────┤  ├──────────────────┤
-│ + execute()    │  │ + execute()   │  │ + execute()      │
-│ + validate()   │  │ + validate()  │  │ + validate()     │
-└────────────────┘  └───────────────┘  └──────────────────┘
-
-┌────────────────┐  ┌───────────────┐  ┌──────────────────┐
-│   RepCmd       │  │   Mount       │  │    RmDisk        │
-├────────────────┤  ├───────────────┤  ├──────────────────┤
-│ + execute()    │  │ + execute()   │  │ + execute()      │
-│ + validate()   │  │ + validate()  │  │ + validate()     │
-└────────────────┘  └───────────────┘  └──────────────────┘
-```
+| Método | Endpoint | Body / Params | Respuesta |
+|---|---|---|---|
+| POST | `/command` | `{"command": "mkdisk ..."}` | `{"output": "OK: ..."}` |
+| GET | `/status` | — | `{"status":"ok"}` |
+| GET | `/disks` | — | Lista de particiones montadas |
+| GET | `/browse` | `?id=491A&path=/home` | Contenido del directorio |
+| GET | `/file` | `?id=491A&path=/home/f.txt` | Contenido del archivo |
+| GET | `/report` | `?path=/ruta/reporte.png` | Imagen binaria del reporte |
+| GET | `/journaling` | `?id=491B` | Entradas del journal EXT3 |
+| GET | `/session` | — | Estado de la sesión activa |
 
 ---
 
 ## Flujo de Ejecución
 
-### Creación de Disco y Archivo
-
 ```
-Usuario: mkdisk -size=100 -unit=M -path=/root/disco.dsk
-    │
-    ▼
-main.cpp detecta comando
-    │
-    ▼
-MkDisk::execute() es llamado
-    │
-    ├─ Valida parámetros
-    ├─ Calcula tamaño total en bytes
-    ├─ Crea archivo en disco
-    └─ Inicializa MBR con sectores vacíos
-    │
-    ▼
-Disco creado exitosamente
-```
-
-### Particionamiento
-
-```
-Usuario: fdisk -size=50 -unit=M -type=P -name=p1 -path=/root/disco.dsk
-    │
-    ▼
-FDisk::execute() es llamado
-    │
-    ├─ Lee MBR existente
-    ├─ Busca entrada libre en tabla de particiones
-    ├─ Valida espacio disponible
-    ├─ Crea nueva entrada de partición
-    ├─ Actualiza tabla de particiones del MBR
-    └─ Escribe MBR modificado en disco
-    │
-    ▼
-Partición creada exitosamente
-```
-
-### Formateo y Login
-
-```
-Usuario: mkfs -type=ext2 -fs=ext2 -id=p1 -path=/root/disco.dsk
-    │
-    ▼
-Mkfs::execute() es llamado
-    │
-    ├─ Lee partición desde disco
-    ├─ Crea SuperBloque EXT2
-    ├─ Inicializa tabla de inodos
-    ├─ Crea mapas de bits (bloques e inodos)
-    ├─ Crea inode raíz
-    ├─ Crea usuario root con contraseña
-    └─ Escribe todo en la partición
-    │
-    ▼
-mkfsSu: login -user=root -pass=123 -id=p1
-    │
-    ▼
-Login::execute() es llamado
-    │
-    ├─ Recupera tabla de usuarios de la partición
-    ├─ Busca usuario por nombre
-    ├─ Valida contraseña contra hash
-    ├─ Crea sesión de usuario
-    └─ Actualiza contexto global
-    │
-    ▼
-Usuario autenticado exitosamente
-```
-
-### Creación Archivo
-
-```
-Usuario: mkfile -name=/archivo.txt -size=1024 -path=/root/disco.dsk
-    │
-    ▼
-MkFile::execute() es llamado
-    │
-    ├─ Valida que usuario esté autenticado
-    ├─ Parsea ruta del archivo
-    ├─ Busca directorio padre
-    │
-    ├─ Encuentra inode libre
-    ├─ Crea entrada de inode
-    ├─ Asigna bloques de datos (según tamaño)
-    │
-    ├─ Actualiza mapa de bits de inodos
-    ├─ Actualiza mapa de bits de bloques
-    │
-    ├─ Añade entrada en bloque de directorio padre
-    └─ Escribe todos los cambios en disco
-    │
-    ▼
-Archivo creado exitosamente
-```
-
-### Lectura de Archivo
-
-```
-Usuario: cat -path=/root/disco.dsk -file=/archivo.txt
-    │
-    ▼
-Cat::execute() es llamado
-    │
-    ├─ Busca inode del archivo
-    ├─ Valida permisos de lectura
-    │
-    ├─ Lee tabla de punteros de bloque en inode
-    ├─ Por cada puntero de bloque:
-    │   ├─ Loza bloque de datos del disco
-    │   └─ Añade contenido a buffer
-    │
-    └─ Imprime contenido en consola
-    │
-    ▼
-Contenido mostrado
+Usuario escribe comando en UI
+        │
+        ▼
+Frontend (api.ts) → POST /command
+        │
+        ▼
+server.cpp — parsea argumentos con splitArgs()
+        │
+        ├── mkdisk → MkDisk::execute()
+        ├── fdisk  → Fdisk::execute() / executeDelete() / executeAdd()
+        ├── mkfs   → Mkfs::execute() → escribe EXT2 o EXT3 en disco
+        ├── mkdir  → MkdirCmd::execute() → resolvePath() + allocInode()
+        ├── copy   → CopyCmd::execute() → recursivo si es directorio
+        ├── chmod  → ChmodCmd::execute() → actualiza i_perm en inodo
+        ├── loss   → LossCmd::execute() → zeroes el área de journaling
+        └── ...
+        │
+        ▼
+ext2_writer.cpp — writeInode(), writeBlock(), writeSuperBlock()
+        │
+        ▼
+Archivo .mia en disco
+        │
+        ▼ (si EXT3)
+journal_manager.cpp → JournalManager::write() → graba entrada Journal
+        │
+        ▼
+Respuesta JSON → Frontend → Terminal de salida
 ```
 
 ---
 
-## Compilación y Construcción
+## Compilación
 
-### Requisitos Previos
-```bash
-# Ubuntu/Debian
-sudo apt-get install cmake g++ make nodejs npm
-
-# macOS
-brew install cmake gcc make node npm
-
-# Fedora/RHEL
-sudo dnf install cmake gcc-c++ make nodejs npm
-```
-
-### Pasos de Compilación
+### Compilación local
 
 ```bash
-# 1. Navegar al directorio del proyecto
-cd /home/mariano/MIA_1S2026_P1_202101149
-
-# 2. Crear directorio de compilación
 cd frontend/backend
-mkdir build
+cmake -B build -S .
 cd build
-
-# 3. Configurar compilación con CMake
-cmake ..
-
-# 4. Compilar código C++
-make
-
-# 5. Verificar ejecutable
-ls -la extreamfs
+make -j$(nproc)
+# Ejecutable: frontend/backend/build/extreamfs
 ```
 
-### Flags de Compilación
-
-```cmake
-# En CMakeLists.txt:
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -O2")
-
-# Debug:
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -g -O0")
-```
-
-### Instalación de Dependencias Frontend
+### Ejecución local
 
 ```bash
-cd frontend
-npm install
-
-# O instalar paquetes específicos:
-npm install next react typescript
-npm install -D tailwindcss postcss autoprefixer
-npm install eslint @typescript-eslint/parser
+./frontend/backend/build/extreamfs
+# Escucha en http://localhost:8080
 ```
 
----
+### Dependencias del servidor
 
-## Detalles de Implementación
-
-### 1. Gestor de Discos
-
-**Responsabilidades:**
-- Crear archivos de disco virtual
-- Mantener tabla de discos disponibles
-- Manejar lectura/escritura en sectores
-- Implementar estrategias de ajuste (FF, BF, WF)
-
-**Archivos clave:**
-- `disk_creator.cpp`: Creación y manipulación de archivos
-- `mbr.h`: Definición de estructura MBR
-- `ebr.h`: Definición de estructura EBR
-
-### 2. Sistema de Archivos EXT2
-
-**Responsabilidades:**
-- Leer y escribir SuperBloques
-- Gestionar tabla de inodos
-- Administrar bloques de datos
-- Mantener mapas de bits
-
-**Archivos clave:**
-- `ext2_reader.cpp`: Lectura de estructuras EXT2
-- `ext2_writer.cpp`: Escritura de estructuras EXT2
-- `SuperBlock.cpp`: Manipulación de SuperBloque
-- `EXT2Utils.h`: Funciones auxiliares
-
-### 3. Gestor de Usuarios y Permisos
-
-**Responsabilidades:**
-- Autenticación de usuarios
-- Gestión de grupos
-- Aplicación de permisos POSIX
-- Mantenimiento de sesiones
-
-**Archivos clave:**
-- `login.cpp`: Autenticación
-- `logout.cpp`: Cierre de sesión
-- `session_manager.cpp`: Gestión de sesiones
-- `users_manager.h`: Tablas de usuarios/grupos
-- `permissions.h`: Cálculo de permisos
-
-### 4. Servidor HTTP
-
-**Responsabilidades:**
-- Procesar solicitudes HTTP (POST)
-- Parsear JSON con comandos
-- Ejecutar comandos en backend
-- Retornar respuestas JSON
-
-**Archivos clave:**
-- `server.cpp`: Implementación de servidor
-- `httplib.h`: Librería HTTP
-
-**Endpoints:**
-```
-POST /command
-{
-    "command": "mkdisk -size=100 -unit=M -fit=FF -path=/root/disco.dsk"
-}
-
-Respuesta:
-{
-    "status": "success",
-    "output": "Disco creado exitosamente"
-}
+```bash
+# Ubuntu 22.04
+sudo apt install -y cmake g++ graphviz
 ```
 
-### 5. Generadores de Reportes
-
-**Tipos de reportes:**
-- **MBR Report**: Visualiza tabla de particiones
-- **SuperBloque**: Metadatos del filesystem
-- **Mapa de Bits Bloques**: Estado de asignación
-- **Mapa de Bits Inodos**: Inodos usados/libres
-- **Árbol de Directorios**: Estructura jerárquica
-- **Listado de Archivos**: Detalle de archivos
-
-**Librería utilizada:**
-- GraphViz para generar visualizaciones
-- Exporta a PNG o JPG
-
-### 6. Frontend Next.js
-
-**Componentes principales:**
-- `CommandPanel`: Entrada de comandos
-- `Terminal`: Mostrar salida
-- `FileExplorer`: Navegación de directorios
-- `BlockViewer`: Visualización de bloques
-
-**Hooks:**
-- `useFilesystem`: Estado compartido del sistema
-
-**Servicios:**
-- `api.ts`: Cliente HTTP para comunicar con backend
-
----
-
-## Variables de Sesión y Estado
-
-```cpp
-struct SessionContext {
-    bool isAuthenticated;           // ¿Usuario autenticado?
-    int currentUserID;              // ID del usuario actual
-    int currentGroupID;             // ID del grupo actual
-    std::string currentPartition;   // Partición montada
-    std::string currentPath;        // Directorio actual
-    int currentInode;               // Inode actual
-};
-```
-
----
-
-## Algoritmos Clave
-
-### Búsqueda de Inode Libre
-```cpp
-// Recorre mapa de bits de inodos
-// Encuentra primer 0 (inodo libre)
-// Marca como 1 (en uso)
-// Retorna número de inode
-```
-
-### Búsqueda de Bloque Libre
-```cpp
-// First Fit: Primer bloque disponible
-// Best Fit: Bloque que mejor se ajusta al tamaño
-// Worst Fit: Bloque más grande disponible
-```
-
-### Lectura de Ruta
-```cpp
-// "/archivo.txt" → ["/", "archivo.txt"]
-// "/dir1/dir2/archivo" → ["/", "dir1", "dir2", "archivo"]
-// Busca cada componente en tabla de inodos
-```
-
----
-
-## Limitaciones Conocidas
-
-1. **Tamaño máximo de archivo**: 4GB (límite de EXT2)
-2. **Nombre de archivo**: Máximo 255 caracteres
-3. **Profundidad de directorios**: Sin límite teórico
-4. **Usuarios simultaneos**: Solo uno por partición montada
-5. **Particiones lógicas**: Máximo 11 en disco extendido
-
----
-
-## Performance
-
-| Operación | Complejidad | Tiempo Estimado |
-|-----------|-----------|-----------------|
-| Crear disco | O(n) | < 1 segundo |
-| Formatear partición | O(n) | < 2 segundos |
-| Login/Logout | O(1) | < 100ms |
-| Crear archivo | O(log n) | < 500ms |
-| Leer archivo | O(n) | < 1 segundo |
-| Buscar archivo | O(n) | < 1 segundo |
-| Generar reporte | O(n) | < 2 segundos |
-
----
-
-## Conclusiones Técnicas
-
-EXTREAMFS es una implementación educativa completa de un sistema de archivos EXT2 que demuestra:
-
-- ✓ Arquitectura en capas bien definida
-- ✓ Separación clara entre frontend y backend
-- ✓ Implementación de EXT2 desde cero
-- ✓ Sistema completo de autenticación y permisos
-- ✓ Interfaz moderna y responsiva
-- ✓ Documentación técnica comprensiva
-
-El proyecto sirve como base para aprender sobre:
-- Sistemas de archivos
-- Gestión de discos
-- Autenticación y permisos
-- Arquitectura cliente-servidor
-- Desarrollo web moderno
+Graphviz es requerido para los reportes (comando `dot` internamente).
